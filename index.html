@@ -60,7 +60,7 @@
     .metric span { color: var(--muted); font-size: 13px; }
     .metric strong { font-size: 22px; }
     .metric small { color: var(--muted); font-size: 13px; }
-    .month-nav { display: grid; grid-template-columns: auto 1fr auto auto; gap: 8px; align-items: center; }
+    .month-nav { display: grid; grid-template-columns: auto 1fr 170px auto auto; gap: 8px; align-items: center; }
     .month-label { min-height: 42px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 8px; background: #fff; font-weight: 800; }
     .owner-grid { display: grid; gap: 1px; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--line); }
     .owner-card { box-shadow: none; border: 0; border-radius: 0; overflow: hidden; }
@@ -80,27 +80,25 @@
     .owner-button.active { background: var(--green-soft); }
     .owner-name { font-size: 15px; font-weight: 900; color: var(--text); }
     .owner-line { font-size: 15px; color: var(--text); white-space: nowrap; }
-    .owner-detail-summary { display: none; grid-template-columns: 1fr 1fr; gap: 8px; padding: 10px; border-top: 1px solid var(--line); background: #fbfdfc; }
+    .owner-detail-summary { display: none; grid-template-columns: 1fr 1fr auto; gap: 8px; padding: 10px; border-top: 1px solid var(--line); background: #fbfdfc; }
     .owner-card.open .owner-detail-summary { display: grid; }
-    .detail-metric { border: 1px solid var(--line); border-radius: 8px; background: #fff; padding: 10px; display: grid; gap: 4px; }
+    .detail-metric { border: 1px solid var(--line); border-radius: 8px; background: #fff; padding: 10px; display: grid; gap: 4px; text-align: left; cursor: pointer; }
+    .detail-metric.active { border-color: var(--green); background: var(--green-soft); }
     .detail-metric span { color: var(--muted); font-size: 12px; }
     .detail-metric strong { font-size: 16px; }
+    .detail-reset { align-self: stretch; min-width: 72px; }
     .detail-list { display: none; border-top: 1px solid var(--line); padding: 10px; gap: 8px; background: #fbfdfc; }
     .owner-card.open .detail-list { display: grid; }
     .report-card { box-shadow: none; padding: 12px; display: grid; gap: 9px; }
-    .report-top { display: flex; justify-content: space-between; gap: 8px; align-items: start; }
+    .report-top { display: grid; gap: 4px; }
     .client { font-weight: 900; font-size: 16px; }
     .report-info { color: var(--muted); font-size: 13px; display: flex; gap: 8px; flex-wrap: wrap; }
+    .report-bottom { display: flex; justify-content: space-between; gap: 8px; align-items: end; }
     .report-actions { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
     .badge { display: inline-flex; align-items: center; min-height: 25px; border-radius: 999px; padding: 0 9px; font-size: 12px; font-weight: 800; white-space: nowrap; }
     .badge.new { background: var(--blue-soft); color: var(--blue); }
     .badge.growth { background: var(--amber-soft); color: var(--amber); }
     .empty { color: var(--muted); text-align: center; padding: 24px 10px; border: 1px dashed #cbd8d1; border-radius: 8px; background: #fff; }
-    .desktop-table { overflow: auto; }
-    table { width: 100%; border-collapse: collapse; min-width: 860px; }
-    th, td { padding: 10px 12px; border-bottom: 1px solid var(--line); text-align: left; font-size: 14px; }
-    th { color: var(--muted); background: #f9fbfa; }
-    .tools { display: flex; gap: 8px; flex-wrap: wrap; }
     .sticky-save { display: none; }
     @media (max-width: 900px) {
       main { display: block; padding-bottom: 88px; }
@@ -110,8 +108,10 @@
       .quick-row { grid-template-columns: repeat(3, 1fr); }
       .owner-button { grid-template-columns: 70px 1fr; }
       .owner-line { text-align: right; font-size: 14px; }
-      .owner-detail-summary { grid-template-columns: 1fr; }
-      .desktop-table, .tools { display: none; }
+      .owner-detail-summary { grid-template-columns: 1fr 1fr; }
+      .detail-reset { grid-column: 1 / -1; }
+      .report-bottom { align-items: start; }
+      .report-actions .btn { min-height: 38px; padding: 0 10px; }
       .sticky-save { display: block; position: sticky; bottom: 0; z-index: 4; background: rgba(244,247,245,.94); backdrop-filter: blur(8px); padding-top: 8px; }
       .form > #submitBtn { display: none; }
     }
@@ -177,20 +177,12 @@
           <div class="month-nav">
             <button class="btn" type="button" id="prevMonthBtn">전 달</button>
             <div class="month-label" id="monthLabel">이번 달</div>
+            <input id="monthPicker" type="month" aria-label="월 선택">
             <button class="btn" type="button" id="currentMonthBtn">현재</button>
             <button class="btn" type="button" id="nextMonthBtn">다음 달</button>
           </div>
           <div class="owner-grid" id="ownerCards"></div>
           <div class="empty" id="empty">아직 입력된 보고가 없습니다.</div>
-          <div class="desktop-table">
-            <table>
-              <thead><tr><th>날짜</th><th>담당자</th><th>거래처</th><th>품목</th><th>구분</th><th>금액</th><th>처방입력</th><th>관리</th></tr></thead>
-              <tbody id="rows"></tbody>
-            </table>
-          </div>
-          <div class="tools">
-            <button class="btn" type="button" id="exportBtn">CSV 내려받기</button>
-          </div>
         </div>
       </section>
     </section>
