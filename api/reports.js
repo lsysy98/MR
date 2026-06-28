@@ -57,7 +57,8 @@ function toDb(item) {
     client: item.client,
     type: item.type,
     product: item.product,
-    amount: Number(item.amount || 0)
+    amount: Number(item.amount || 0),
+    prescription_done: Boolean(item.prescriptionDone)
   };
 }
 
@@ -71,7 +72,8 @@ function fromDb(row) {
     client: row.client,
     type: row.type,
     product: row.product,
-    amount: Number(row.amount || 0)
+    amount: Number(row.amount || 0),
+    prescriptionDone: Boolean(row.prescription_done)
   };
 }
 

@@ -19,33 +19,15 @@
       --amber-soft: #fff2d8;
       --amber: #b7791f;
       --red: #c24141;
+      --red-soft: #fff1f1;
     }
-    body {
-      margin: 0;
-      background: var(--bg);
-      color: var(--text);
-      font-family: "Malgun Gothic", system-ui, sans-serif;
-    }
-    header {
-      background: var(--panel);
-      border-bottom: 1px solid var(--line);
-      padding: 14px 16px;
-      position: sticky;
-      top: 0;
-      z-index: 5;
-    }
+    body { margin: 0; background: var(--bg); color: var(--text); font-family: "Malgun Gothic", system-ui, sans-serif; }
+    header { background: var(--panel); border-bottom: 1px solid var(--line); padding: 14px 16px; position: sticky; top: 0; z-index: 5; }
     h1 { margin: 0; font-size: 19px; }
     h2 { margin: 0; font-size: 17px; }
     button, input, select { font: inherit; }
-    main {
-      max-width: 1120px;
-      margin: 0 auto;
-      padding: 14px;
-      display: grid;
-      grid-template-columns: 360px 1fr;
-      gap: 14px;
-    }
-    section, .metric, .owner-card, .report-card {
+    main { max-width: 1120px; margin: 0 auto; padding: 14px; display: grid; grid-template-columns: 360px 1fr; gap: 14px; }
+    section, .metric, .owner-card, .report-card, .breakdown-card {
       background: var(--panel);
       border: 1px solid var(--line);
       border-radius: 8px;
@@ -54,101 +36,58 @@
     .head { padding: 16px 16px 6px; }
     .form, .body { padding: 12px 16px 16px; display: grid; gap: 12px; }
     label { display: grid; gap: 7px; color: var(--muted); font-size: 13px; }
-    input, select {
-      width: 100%;
-      min-height: 44px;
-      border: 1px solid #cbd8d1;
-      border-radius: 8px;
-      padding: 10px 12px;
-      background: #fff;
-      color: var(--text);
-    }
+    input, select { width: 100%; min-height: 44px; border: 1px solid #cbd8d1; border-radius: 8px; padding: 10px 12px; background: #fff; color: var(--text); }
     .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-    .btn {
-      min-height: 42px;
-      border: 1px solid #bfd0c8;
-      border-radius: 8px;
-      background: #fff;
-      color: #0f5b47;
-      padding: 0 13px;
-      cursor: pointer;
-    }
+    .btn { min-height: 42px; border: 1px solid #bfd0c8; border-radius: 8px; background: #fff; color: #0f5b47; padding: 0 13px; cursor: pointer; }
     .btn.primary { background: var(--green); border-color: var(--green); color: #fff; }
     .btn.danger { color: var(--red); border-color: #efc8c8; }
+    .btn.done { background: var(--green-soft); border-color: #98d8bf; color: #0f5b47; font-weight: 800; }
+    .btn.pending { background: var(--red-soft); border-color: #efb8b8; color: #b42323; font-weight: 800; }
     .seg { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 4px; border: 1px solid #cbd8d1; border-radius: 8px; }
     .seg button { border: 0; border-radius: 6px; background: #fff; color: var(--muted); min-height: 38px; cursor: pointer; }
     .seg button.active { background: var(--green); color: #fff; font-weight: 800; }
-    .quick-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
-    .quick-date { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .quick-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
     .amount-wrap { position: relative; }
     .amount-wrap input { padding-right: 54px; }
-    .amount-unit {
-      position: absolute;
-      right: 12px;
-      top: 50%;
-      transform: translateY(-50%);
-      color: var(--muted);
-      font-size: 13px;
-      pointer-events: none;
-    }
+    .amount-unit { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 13px; pointer-events: none; }
     .helper { color: var(--muted); font-size: 12px; margin-top: -4px; }
     .toast { min-height: 22px; color: #0f5b47; font-size: 13px; }
-    .status {
-      border: 1px solid #cbd8d1;
-      border-radius: 8px;
-      padding: 10px 12px;
-      background: #fbfdfc;
-      color: var(--muted);
-      font-size: 13px;
-    }
+    .status { border: 1px solid #cbd8d1; border-radius: 8px; padding: 10px 12px; background: #fbfdfc; color: var(--muted); font-size: 13px; }
     .status.ok { border-color: #98d8bf; background: #ecf9f3; color: #0f5b47; }
     .status.error { border-color: #efb8b8; background: #fff1f1; color: #b42323; }
     .summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 14px; }
-    .metric { padding: 14px; min-height: 78px; display: grid; gap: 8px; align-content: space-between; }
+    .metric { padding: 14px; min-height: 92px; display: grid; gap: 6px; align-content: space-between; }
     .metric span { color: var(--muted); font-size: 13px; }
     .metric strong { font-size: 22px; }
+    .metric small { color: var(--muted); font-size: 13px; }
     .month-nav { display: grid; grid-template-columns: auto 1fr auto auto; gap: 8px; align-items: center; }
     .month-label { min-height: 42px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 8px; background: #fff; font-weight: 800; }
+    .breakdown { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .breakdown-card { box-shadow: none; padding: 12px; display: grid; gap: 8px; }
+    .breakdown-card h3 { margin: 0; font-size: 15px; }
+    .product-line { display: flex; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 13px; border-top: 1px solid #eef3f0; padding-top: 7px; }
     .owner-grid { display: grid; gap: 10px; }
     .owner-card { box-shadow: none; overflow: hidden; }
-    .owner-button {
-      width: 100%;
-      border: 0;
-      background: #fff;
-      padding: 14px;
-      display: grid;
-      grid-template-columns: 1fr auto;
-      gap: 8px;
-      text-align: left;
-      cursor: pointer;
-    }
+    .owner-button { width: 100%; border: 0; background: #fff; padding: 14px; display: grid; grid-template-columns: 1fr auto; gap: 8px; text-align: left; cursor: pointer; }
     .owner-button.active { background: var(--green-soft); }
     .owner-name { font-size: 17px; font-weight: 900; color: #0f5b47; }
     .owner-money { font-size: 20px; font-weight: 900; }
     .owner-meta, .product-meta { color: var(--muted); font-size: 13px; }
-    .product-meta { grid-column: 1 / -1; }
+    .owner-meta { display: grid; gap: 3px; }
+    .product-meta { grid-column: 1 / -1; display: grid; gap: 4px; }
     .detail-list { display: none; border-top: 1px solid var(--line); padding: 10px; gap: 8px; background: #fbfdfc; }
     .owner-card.open .detail-list { display: grid; }
     .report-card { box-shadow: none; padding: 12px; display: grid; gap: 9px; }
     .report-top { display: flex; justify-content: space-between; gap: 8px; align-items: start; }
     .client { font-weight: 900; font-size: 16px; }
     .report-info { color: var(--muted); font-size: 13px; display: flex; gap: 8px; flex-wrap: wrap; }
-    .report-actions { display: flex; gap: 8px; justify-content: flex-end; }
-    .badge {
-      display: inline-flex;
-      align-items: center;
-      min-height: 25px;
-      border-radius: 999px;
-      padding: 0 9px;
-      font-size: 12px;
-      font-weight: 800;
-      white-space: nowrap;
-    }
+    .report-actions { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+    .badge { display: inline-flex; align-items: center; min-height: 25px; border-radius: 999px; padding: 0 9px; font-size: 12px; font-weight: 800; white-space: nowrap; }
     .badge.new { background: var(--blue-soft); color: var(--blue); }
     .badge.growth { background: var(--amber-soft); color: var(--amber); }
     .empty { color: var(--muted); text-align: center; padding: 24px 10px; border: 1px dashed #cbd8d1; border-radius: 8px; background: #fff; }
     .desktop-table { overflow: auto; }
-    table { width: 100%; border-collapse: collapse; min-width: 760px; }
+    table { width: 100%; border-collapse: collapse; min-width: 860px; }
     th, td { padding: 10px 12px; border-bottom: 1px solid var(--line); text-align: left; font-size: 14px; }
     th { color: var(--muted); background: #f9fbfa; }
     .tools { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -156,18 +95,11 @@
     @media (max-width: 900px) {
       main { display: block; padding-bottom: 88px; }
       .dashboard { margin-top: 14px; }
-      .summary { grid-template-columns: repeat(2, 1fr); }
+      .summary, .breakdown { grid-template-columns: 1fr 1fr; }
       .row, .month-nav { grid-template-columns: 1fr; }
+      .quick-row { grid-template-columns: repeat(3, 1fr); }
       .desktop-table, .tools { display: none; }
-      .sticky-save {
-        display: block;
-        position: sticky;
-        bottom: 0;
-        z-index: 4;
-        background: rgba(244,247,245,.94);
-        backdrop-filter: blur(8px);
-        padding-top: 8px;
-      }
+      .sticky-save { display: block; position: sticky; bottom: 0; z-index: 4; background: rgba(244,247,245,.94); backdrop-filter: blur(8px); padding-top: 8px; }
       .form > #submitBtn { display: none; }
     }
   </style>
@@ -179,13 +111,7 @@
       <div class="head"><h2>거래처 입력</h2></div>
       <form class="form" id="reportForm">
         <label>담당자 이름 <input id="owner" type="text" required></label>
-        <label>날짜
-          <input id="date" type="date" required>
-          <div class="quick-date">
-            <button class="btn" type="button" data-date-quick="yesterday">어제</button>
-            <button class="btn" type="button" data-date-quick="today">오늘</button>
-          </div>
-        </label>
+        <label>날짜 <input id="date" type="date" required></label>
         <label>거래처명 <input id="client" type="text" required autocomplete="off"></label>
         <label>구분
           <div class="seg">
@@ -210,10 +136,11 @@
           </label>
         </div>
         <div class="quick-row">
-          <button class="btn" type="button" data-amount="10">10만</button>
-          <button class="btn" type="button" data-amount="30">30만</button>
-          <button class="btn" type="button" data-amount="50">50만</button>
-          <button class="btn" type="button" data-amount="100">100만</button>
+          <button class="btn" type="button" data-add-amount="1">+1만</button>
+          <button class="btn" type="button" data-add-amount="5">+5만</button>
+          <button class="btn" type="button" data-add-amount="10">+10만</button>
+          <button class="btn" type="button" data-add-amount="50">+50만</button>
+          <button class="btn" type="button" data-add-amount="100">+100만</button>
         </div>
         <div class="helper" id="amountPreview">1 입력 = 10,000원</div>
         <button class="btn primary" id="submitBtn" type="submit">저장</button>
@@ -225,10 +152,10 @@
 
     <section class="dashboard">
       <div class="summary">
-        <div class="metric"><span>월 총 보고</span><strong id="totalCount">0건</strong></div>
-        <div class="metric"><span>월 총 금액</span><strong id="totalAmount">0원</strong></div>
-        <div class="metric"><span>신규</span><strong id="newCount">0건</strong></div>
-        <div class="metric"><span>매출증대</span><strong id="growthCount">0건</strong></div>
+        <div class="metric"><span>전체</span><strong id="totalAmount">0원</strong><small id="totalCount">0건</small></div>
+        <div class="metric"><span>신규</span><strong id="newAmount">0원</strong><small id="newCount">0건</small></div>
+        <div class="metric"><span>매출증대</span><strong id="growthAmount">0원</strong><small id="growthCount">0건</small></div>
+        <div class="metric"><span>처방입력</span><strong id="doneRate">0%</strong><small id="doneCount">0 / 0건</small></div>
       </div>
       <section>
         <div class="head"><h2>담당자별 현황</h2></div>
@@ -240,11 +167,21 @@
             <button class="btn" type="button" id="currentMonthBtn">현재</button>
             <button class="btn" type="button" id="nextMonthBtn">다음 달</button>
           </div>
+          <div class="breakdown">
+            <div class="breakdown-card">
+              <h3>신규 품목</h3>
+              <div id="newProductBreakdown"></div>
+            </div>
+            <div class="breakdown-card">
+              <h3>매출증대 품목</h3>
+              <div id="growthProductBreakdown"></div>
+            </div>
+          </div>
           <div class="owner-grid" id="ownerCards"></div>
           <div class="empty" id="empty">아직 입력된 보고가 없습니다.</div>
           <div class="desktop-table">
             <table>
-              <thead><tr><th>날짜</th><th>담당자</th><th>거래처</th><th>품목</th><th>구분</th><th>금액</th><th>관리</th></tr></thead>
+              <thead><tr><th>날짜</th><th>담당자</th><th>거래처</th><th>품목</th><th>구분</th><th>금액</th><th>처방입력</th><th>관리</th></tr></thead>
               <tbody id="rows"></tbody>
             </table>
           </div>
