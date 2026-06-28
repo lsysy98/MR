@@ -1,0 +1,127 @@
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+function json(res, status, data) {
+  res.statusCode = status;
+  res.setHeader("Content-Type", "application/json; charset=utf-8");
+  res.end(JSON.stringify(data));
+}
+
+async function supabase(path, options = {}) {
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+    throw new Error("Supabase environment variables are missing.");
+  }
+
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+    ...options,
+    headers: {
+      apikey: SUPABASE_SERVICE_ROLE_KEY,
+      Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+      "Content-Type": "application/json",
+      Prefer: "return=representation",
+      ...(options.headers || {})
+    }
+  });
+
+  const text = await response.text();
+  const data = text ? JSON.parse(text) : null;
+
+  if (!response.ok) {
+    throw new Error(data?.message || text || "Supabase request failed.");
+  }
+
+  return data;
+}
+
+function toDb(item) {
+  return {
+    id: item.id,
+    created_at: Number(item.createdAt || Date.now()),
+    updated_at: Number(item.updatedAt || Date.now()),
+    report_date: item.date,
+    owner: item.owner,
+    client: item.client,
+    type: item.type,
+    product: item.product,
+    amount: Number(item.amount || 0)
+  };
+}
+
+function fromDb(row) {
+  return {
+    id: row.id,
+    createdAt: Number(row.created_at),
+    updatedAt: Number(row.updated_at),
+    date: row.report_date,
+    owner: row.owner,
+    client: row.client,
+    type: row.type,
+    product: row.product,
+    amount: Number(row.amount || 0)
+  };
+}
+
+async function readBody(req) {
+  if (req.body && typeof req.body === "object") return req.body;
+  if (typeof req.body === "string") return JSON.parse(req.body || "{}");
+
+  return await new Promise((resolve, reject) => {
+    let raw = "";
+    req.on("data", chunk => { raw += chunk; });
+    req.on("end", () => {
+      try {
+        resolve(raw ? JSON.parse(raw) : {});
+      } catch (error) {
+        reject(error);
+      }
+    });
+    req.on("error", reject);
+  });
+}
+
+module.exports = async function handler(req, res) {
+  try {
+    if (req.method === "GET") {
+      const rows = await supabase("reports?select=*&order=created_at.desc");
+      return json(res, 200, rows.map(fromDb));
+    }
+
+    if (req.method === "POST") {
+      const item = await readBody(req);
+      const now = Date.now();
+      item.id = item.id || `${now}-${Math.random().toString(16).slice(2)}`;
+      item.createdAt = item.createdAt || now;
+      item.updatedAt = now;
+      const rows = await supabase("reports", {
+        method: "POST",
+        body: JSON.stringify(toDb(item))
+      });
+      return json(res, 201, fromDb(rows[0]));
+    }
+
+    if (req.method === "PUT") {
+      const item = await readBody(req);
+      item.updatedAt = Date.now();
+      const rows = await supabase(`reports?id=eq.${encodeURIComponent(item.id)}`, {
+        method: "PATCH",
+        body: JSON.stringify(toDb(item))
+      });
+      return json(res, 200, fromDb(rows[0]));
+    }
+
+    if (req.method === "DELETE") {
+      const url = new URL(req.url, "http://localhost");
+      const ids = url.searchParams.getAll("id");
+      if (!ids.length) return json(res, 400, { error: "id is required" });
+
+      for (const id of ids) {
+        await supabase(`reports?id=eq.${encodeURIComponent(id)}`, { method: "DELETE" });
+      }
+      return json(res, 200, { ok: true, count: ids.length });
+    }
+
+    return json(res, 405, { error: "Method not allowed" });
+  } catch (error) {
+    return json(res, 500, { error: error.message });
+  }
+};

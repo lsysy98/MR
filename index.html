@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>영업 일일보고</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #f4f7f5; color: #17211c; font-family: "Malgun Gothic", system-ui, sans-serif; }
+    header { background: #fff; border-bottom: 1px solid #d9e2dc; padding: 14px 16px; position: sticky; top: 0; z-index: 5; }
+    h1 { margin: 0; font-size: 19px; }
+    main { max-width: 1080px; margin: 0 auto; padding: 14px; display: grid; grid-template-columns: 360px 1fr; gap: 14px; }
+    section, .metric { background: #fff; border: 1px solid #d9e2dc; border-radius: 8px; box-shadow: 0 8px 22px rgba(27,45,37,.08); }
+    h2 { margin: 0; font-size: 17px; }
+    .head { padding: 16px 16px 6px; }
+    .form, .body { padding: 12px 16px 16px; display: grid; gap: 12px; }
+    label { display: grid; gap: 7px; color: #66736d; font-size: 13px; }
+    input, select, button { font: inherit; }
+    input, select { width: 100%; min-height: 44px; border: 1px solid #cbd8d1; border-radius: 8px; padding: 10px 12px; background: #fff; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .seg { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 4px; border: 1px solid #cbd8d1; border-radius: 8px; }
+    .seg button { border: 0; border-radius: 6px; background: #fff; color: #66736d; min-height: 36px; cursor: pointer; }
+    .seg button.active { background: #14765c; color: #fff; }
+    .btn { min-height: 42px; border: 1px solid #bfd0c8; border-radius: 8px; background: #fff; color: #0f5b47; padding: 0 13px; cursor: pointer; }
+    .primary { background: #14765c; border-color: #14765c; color: #fff; }
+    .danger { color: #c24141; border-color: #efc8c8; }
+    .summary { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+    .metric { padding: 14px; min-height: 84px; display: grid; align-content: space-between; }
+    .metric span { color: #66736d; font-size: 13px; }
+    .metric strong { font-size: 24px; }
+    .tabs { display: flex; gap: 6px; padding: 0 16px 12px; border-bottom: 1px solid #d9e2dc; overflow-x: auto; }
+    .tab.active { background: #dff2eb; border-color: #14765c; }
+    .panel { display: none; gap: 10px; }
+    .panel.active { display: grid; }
+    .date-row { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: end; max-width: 430px; }
+    .list { display: grid; gap: 1px; background: #d9e2dc; border: 1px solid #d9e2dc; border-radius: 8px; overflow: hidden; }
+    .list button, .list div { border: 0; background: #fff; min-height: 42px; padding: 9px 12px; display: grid; grid-template-columns: 1fr auto auto auto; gap: 8px; align-items: center; text-align: left; }
+    .list button.active { background: #dff2eb; color: #0f5b47; }
+    .table-wrap { overflow: auto; }
+    table { width: 100%; border-collapse: collapse; min-width: 720px; }
+    th, td { padding: 10px 12px; border-bottom: 1px solid #d9e2dc; text-align: left; font-size: 14px; }
+    th { color: #66736d; background: #f9fbfa; }
+    .owner-link { border: 0; background: transparent; color: #0f5b47; font-weight: 800; text-decoration: underline; cursor: pointer; padding: 0; }
+    .badge { display: inline-flex; align-items: center; min-height: 25px; border-radius: 999px; padding: 0 9px; font-size: 12px; font-weight: 800; }
+    .new { background: #e7f1ff; color: #2563eb; }
+    .growth { background: #fff2d8; color: #b7791f; }
+    .month-group { border: 1px solid #d9e2dc; border-radius: 8px; background: #fff; padding: 12px; display: grid; gap: 6px; }
+    .month-group strong { color: #0f5b47; }
+    .month-group span { color: #66736d; font-size: 13px; }
+    .tools { display: flex; gap: 8px; flex-wrap: wrap; }
+    .toast { min-height: 22px; color: #0f5b47; font-size: 13px; }
+    @media (max-width: 820px) { main { display: block; } .dashboard { margin-top: 14px; } .row, .date-row { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <header><h1>영업 일일보고</h1></header>
+  <main>
+    <section>
+      <div class="head"><h2>거래처 입력</h2></div>
+      <form class="form" id="reportForm">
+        <label>담당자 이름 <input id="owner" type="text" required></label>
+        <label>날짜 <input id="date" type="date" required></label>
+        <label>거래처명 <input id="client" type="text" required></label>
+        <label>구분
+          <div class="seg">
+            <button type="button" class="active" data-type="신규">신규</button>
+            <button type="button" data-type="매출증대">매출증대</button>
+          </div>
+        </label>
+        <div class="row">
+          <label>품목/제품군
+            <select id="product">
+              <option>3제+클로르</option>
+              <option>3제</option>
+              <option>클로르</option>
+            </select>
+          </label>
+          <label>예상 금액 <input id="amount" type="text" inputmode="numeric" required></label>
+        </div>
+        <button class="btn primary" id="submitBtn" type="submit">저장</button>
+        <button class="btn" id="cancelEditBtn" type="button">입력 초기화</button>
+        <div class="toast" id="toast"></div>
+      </form>
+    </section>
+    <section class="dashboard">
+      <div class="summary">
+        <div class="metric"><span id="resultLabel">이번 달 전체</span><strong id="resultTotal">0건</strong></div>
+        <div class="metric"><span>예상 금액</span><strong id="amountTotal">0원</strong></div>
+      </div>
+      <section>
+        <div class="head"><h2>보고 현황</h2></div>
+        <div class="tabs">
+          <button class="btn tab active" type="button" data-view="list">전체</button>
+          <button class="btn tab" type="button" data-view="date">날짜별</button>
+          <button class="btn tab" type="button" data-view="owner">담당자별</button>
+        </div>
+        <div class="body">
+          <div class="panel" id="datePanel">
+            <div class="date-row">
+              <button class="btn" type="button" id="prevDateBtn">이전날</button>
+              <label>날짜 선택 <input id="dateSelect" type="date"></label>
+              <button class="btn" type="button" id="nextDateBtn">다음날</button>
+            </div>
+            <div class="list" id="dateSummary"></div>
+          </div>
+          <div class="panel" id="ownerPanel">
+            <label style="max-width:260px;">월 선택
+              <select id="ownerMonth">
+                <option value="all">전체</option>
+                <option value="1">1월</option><option value="2">2월</option><option value="3">3월</option>
+                <option value="4">4월</option><option value="5">5월</option><option value="6">6월</option>
+                <option value="7">7월</option><option value="8">8월</option><option value="9">9월</option>
+                <option value="10">10월</option><option value="11">11월</option><option value="12">12월</option>
+              </select>
+            </label>
+            <div class="list" id="ownerSummary"></div>
+            <div id="monthGroups"></div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th><input id="selectAll" type="checkbox"></th><th>날짜</th><th>담당자</th><th>거래처</th><th>품목</th><th>구분</th><th>금액</th><th>관리</th></tr></thead>
+              <tbody id="rows"></tbody>
+            </table>
+          </div>
+          <div id="empty" style="display:none;color:#66736d;text-align:center;padding:20px;">아직 입력된 보고가 없습니다.</div>
+          <div class="tools">
+            <button class="btn" type="button" id="deleteSelectedBtn">선택 삭제</button>
+            <button class="btn" type="button" id="exportBtn">CSV 내려받기</button>
+            <button class="btn danger" type="button" id="clearBtn">전체 삭제</button>
+          </div>
+        </div>
+      </section>
+    </section>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>
