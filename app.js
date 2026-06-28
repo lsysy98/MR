@@ -1,277 +1,406 @@
 var money = new Intl.NumberFormat("ko-KR");
 var today = new Date();
 var todayText = dateText(today);
-var currentMonth = String(today.getMonth() + 1);
-var currentYear = String(today.getFullYear());
+var currentYear = today.getFullYear();
+var currentMonth = today.getMonth() + 1;
+var selectedYear = currentYear;
+var selectedMonth = currentMonth;
 var reports = [];
 var selectedType = "신규";
-var activeView = "list";
-var selectedDate = todayText;
-var selectedOwnerMonth = currentMonth;
-var selectedOwner = "";
+var openedOwner = "";
 var editingId = "";
 
 var form = document.getElementById("reportForm");
-var rows = document.getElementById("rows");
 var ownerInput = document.getElementById("owner");
 var dateInput = document.getElementById("date");
 var clientInput = document.getElementById("client");
 var productInput = document.getElementById("product");
 var amountInput = document.getElementById("amount");
-var dateSelect = document.getElementById("dateSelect");
-var ownerMonth = document.getElementById("ownerMonth");
+var amountPreview = document.getElementById("amountPreview");
+var ownerCards = document.getElementById("ownerCards");
+var rows = document.getElementById("rows");
+var statusBox = document.getElementById("statusBox");
 
 dateInput.value = todayText;
-dateSelect.value = todayText;
-ownerMonth.value = currentMonth;
 ownerInput.value = localStorage.getItem("ownerName") || "";
 
 function dateText(d) {
   return [d.getFullYear(), String(d.getMonth() + 1).padStart(2, "0"), String(d.getDate()).padStart(2, "0")].join("-");
 }
-function shiftDate(text, days) {
-  var d = new Date(text + "T00:00:00");
+function shiftedDate(days) {
+  var d = new Date();
   d.setDate(d.getDate() + days);
   return dateText(d);
 }
-function makeId() { return Date.now() + "-" + Math.random().toString(16).slice(2); }
-function digits(v) { return String(v || "").replace(/[^\d]/g, ""); }
-function parseAmount(v) { return Number(digits(v) || 0); }
-function won(v) { var n = Number(v || 0); return n ? money.format(n) + "원" : "-"; }
-function monthOf(x) { return x.date ? String(Number(String(x.date).slice(5, 7))) : currentMonth; }
-function yearOf(x) { return x.date ? String(x.date).slice(0, 4) : currentYear; }
-function isThisMonth(x) { return yearOf(x) === currentYear && monthOf(x) === currentMonth; }
+function makeId() {
+  return Date.now() + "-" + Math.random().toString(16).slice(2);
+}
+function digits(v) {
+  return String(v || "").replace(/[^\d]/g, "");
+}
+function amountMan(v) {
+  return Number(digits(v) || 0);
+}
+function amountWon(v) {
+  return amountMan(v) * 10000;
+}
+function won(v) {
+  var n = Number(v || 0);
+  return n ? money.format(n) + "원" : "0원";
+}
+function monthOf(x) {
+  return x.date ? Number(String(x.date).slice(5, 7)) : currentMonth;
+}
+function yearOf(x) {
+  return x.date ? Number(String(x.date).slice(0, 4)) : currentYear;
+}
+function typeClass(type) {
+  return type === "신규" ? "new" : "growth";
+}
+function status(message, type) {
+  if (!statusBox) return;
+  statusBox.textContent = message;
+  statusBox.className = "status " + (type || "");
+}
 function toast(msg) {
-  document.getElementById("toast").textContent = msg;
-  setTimeout(function(){ document.getElementById("toast").textContent = ""; }, 2200);
+  var box = document.getElementById("toast");
+  box.textContent = msg;
+  setTimeout(function(){ box.textContent = ""; }, 2200);
+}
+function updateAmountPreview() {
+  var man = amountMan(amountInput.value);
+  amountPreview.textContent = man ? money.format(man) + "만원 = " + won(man * 10000) : "1 입력 = 10,000원";
+}
+function selectedMonthLabel() {
+  return selectedYear + "년 " + selectedMonth + "월";
+}
+function moveMonth(delta) {
+  var d = new Date(selectedYear, selectedMonth - 1 + delta, 1);
+  selectedYear = d.getFullYear();
+  selectedMonth = d.getMonth() + 1;
+  openedOwner = "";
+  render();
+}
+function resetToCurrentMonth() {
+  selectedYear = currentYear;
+  selectedMonth = currentMonth;
+  openedOwner = "";
+  render();
 }
 
 async function api(method, body, query) {
   var options = { method: method, headers: { "Content-Type": "application/json" } };
   if (body) options.body = JSON.stringify(body);
   var response = await fetch("/api/reports" + (query || ""), options);
-  var data = await response.json();
+  var data = await response.json().catch(function(){ return {}; });
   if (!response.ok) throw new Error(data.error || "요청 실패");
   return data;
 }
 async function loadData() {
+  status("Supabase 저장창고와 연결 확인 중입니다.", "");
   reports = await api("GET");
+  status("연결 성공: 저장된 보고 " + reports.length + "건을 불러왔습니다.", "ok");
   render();
 }
 async function addData(item) {
+  status("저장 중입니다.", "");
   await api("POST", item);
   await loadData();
   toast("저장되었습니다.");
 }
 async function updateData(item) {
+  status("수정 중입니다.", "");
   await api("PUT", item);
   await loadData();
   toast("수정되었습니다.");
 }
 async function deleteData(id) {
+  if (!confirm("삭제할까요?")) return;
   await api("DELETE", null, "?id=" + encodeURIComponent(id));
   await loadData();
   toast("삭제되었습니다.");
 }
-async function deleteSelectedData(ids) {
-  await api("DELETE", null, "?" + ids.map(function(id){ return "id=" + encodeURIComponent(id); }).join("&"));
-  await loadData();
-  toast("선택 삭제되었습니다.");
-}
 
-function filtered() {
+function monthItems() {
   return reports.filter(function(x) {
-    if (activeView === "date") return x.date === selectedDate && (!selectedOwner || x.owner === selectedOwner);
-    if (activeView === "owner") {
-      var monthOk = selectedOwnerMonth === "all" || monthOf(x) === selectedOwnerMonth;
-      return monthOk && (!selectedOwner || x.owner === selectedOwner);
-    }
-    return isThisMonth(x);
+    return yearOf(x) === selectedYear && monthOf(x) === selectedMonth;
   });
 }
 function summarize(items) {
+  return items.reduce(function(acc, item) {
+    acc.amount += Number(item.amount || 0);
+    if (item.type === "신규") acc.newCount += 1;
+    if (item.type === "매출증대") acc.growthCount += 1;
+    acc.products[item.product] = (acc.products[item.product] || 0) + 1;
+    return acc;
+  }, { amount: 0, newCount: 0, growthCount: 0, products: {} });
+}
+function groupByOwner(items) {
   var map = {};
-  items.forEach(function(x) {
-    var key = x.owner || "미지정";
-    if (!map[key]) map[key] = { amount: 0, newCount: 0, growthCount: 0 };
-    map[key].amount += Number(x.amount || 0);
-    if (x.type === "신규") map[key].newCount += 1;
-    if (x.type === "매출증대") map[key].growthCount += 1;
+  items.forEach(function(item) {
+    var owner = item.owner || "미지정";
+    if (!map[owner]) map[owner] = [];
+    map[owner].push(item);
   });
-  return map;
-}
-function add(parent, tag, text) {
-  var el = document.createElement(tag);
-  el.textContent = text;
-  parent.appendChild(el);
-  return el;
-}
-function renderOwners(id, items, emptyText) {
-  var box = document.getElementById(id);
-  var map = summarize(items);
-  var names = Object.keys(map).sort(function(a,b){ return map[b].amount - map[a].amount; });
-  box.textContent = "";
-  if (!names.length) {
-    var empty = document.createElement("div");
-    add(empty, "span", emptyText); add(empty, "span", "-"); add(empty, "span", "-"); add(empty, "span", "-");
-    box.appendChild(empty);
-    return;
-  }
-  names.forEach(function(name) {
-    var v = map[name];
-    var btn = document.createElement("button");
-    btn.type = "button";
-    btn.setAttribute("data-owner", name);
-    btn.className = selectedOwner === name ? "active" : "";
-    add(btn, "strong", name);
-    add(btn, "span", "신규 " + v.newCount + "건");
-    add(btn, "span", "증대 " + v.growthCount + "건");
-    add(btn, "span", won(v.amount));
-    box.appendChild(btn);
+  return Object.keys(map).sort(function(a, b) {
+    return summarize(map[b]).amount - summarize(map[a]).amount;
+  }).map(function(owner) {
+    return { owner: owner, items: map[owner], summary: summarize(map[owner]) };
   });
 }
-function renderMonthGroups(items) {
-  var box = document.getElementById("monthGroups");
-  box.textContent = "";
-  if (activeView !== "owner" || selectedOwnerMonth !== "all") return;
-  var map = {};
-  items.forEach(function(x) {
-    var key = monthOf(x) + "월";
-    if (!map[key]) map[key] = { amount: 0, clients: [], newCount: 0, growthCount: 0 };
-    map[key].amount += Number(x.amount || 0);
-    map[key].clients.push(x.client);
-    if (x.type === "신규") map[key].newCount += 1;
-    if (x.type === "매출증대") map[key].growthCount += 1;
-  });
-  Object.keys(map).sort(function(a,b){ return Number(a.replace("월","")) - Number(b.replace("월","")); }).forEach(function(month) {
-    var v = map[month];
-    var g = document.createElement("div");
-    g.className = "month-group";
-    add(g, "strong", month + " 총 " + won(v.amount));
-    add(g, "span", "신규 " + v.newCount + "건 / 매출증대 " + v.growthCount + "건");
-    add(g, "span", v.clients.join(" / "));
-    box.appendChild(g);
-  });
+function productText(summary) {
+  var names = ["3제+클로르", "3제", "클로르"];
+  return names.map(function(name) {
+    return name + " " + (summary.products[name] || 0) + "건";
+  }).join(" · ");
 }
-function label() {
-  if (activeView === "date") return selectedOwner ? selectedDate + " " + selectedOwner : selectedDate + " 전체";
-  if (activeView === "owner") return selectedOwnerMonth === "all" ? (selectedOwner ? selectedOwner + " 전체" : "담당자별 전체") : (selectedOwner ? selectedOwner + " " + selectedOwnerMonth + "월" : "담당자별 " + selectedOwnerMonth + "월");
-  return "이번 달 전체";
+function reportCard(item) {
+  var card = document.createElement("div");
+  card.className = "report-card";
+
+  var top = document.createElement("div");
+  top.className = "report-top";
+  var left = document.createElement("div");
+  var client = document.createElement("div");
+  client.className = "client";
+  client.textContent = item.client;
+  var info = document.createElement("div");
+  info.className = "report-info";
+  info.textContent = item.date + " · " + item.product + " · " + won(item.amount);
+  left.appendChild(client);
+  left.appendChild(info);
+  var badge = document.createElement("span");
+  badge.className = "badge " + typeClass(item.type);
+  badge.textContent = item.type;
+  top.appendChild(left);
+  top.appendChild(badge);
+
+  var actions = document.createElement("div");
+  actions.className = "report-actions";
+  var edit = document.createElement("button");
+  edit.className = "btn";
+  edit.type = "button";
+  edit.textContent = "수정";
+  edit.addEventListener("click", function(e) {
+    e.stopPropagation();
+    startEdit(item);
+  });
+  var del = document.createElement("button");
+  del.className = "btn danger";
+  del.type = "button";
+  del.textContent = "삭제";
+  del.addEventListener("click", function(e) {
+    e.stopPropagation();
+    deleteData(item.id).catch(function(error){ status("삭제 실패: " + error.message, "error"); toast(error.message); });
+  });
+  actions.appendChild(edit);
+  actions.appendChild(del);
+
+  card.appendChild(top);
+  card.appendChild(actions);
+  return card;
+}
+function renderOwnerCards(items) {
+  ownerCards.textContent = "";
+  groupByOwner(items).forEach(function(group) {
+    var card = document.createElement("div");
+    card.className = "owner-card" + (openedOwner === group.owner ? " open" : "");
+
+    var button = document.createElement("button");
+    button.type = "button";
+    button.className = "owner-button" + (openedOwner === group.owner ? " active" : "");
+    button.addEventListener("click", function() {
+      openedOwner = openedOwner === group.owner ? "" : group.owner;
+      render();
+    });
+
+    var left = document.createElement("div");
+    var name = document.createElement("div");
+    name.className = "owner-name";
+    name.textContent = group.owner;
+    var meta = document.createElement("div");
+    meta.className = "owner-meta";
+    meta.textContent = "신규 " + group.summary.newCount + "건 / 매출증대 " + group.summary.growthCount + "건";
+    left.appendChild(name);
+    left.appendChild(meta);
+
+    var amount = document.createElement("div");
+    amount.className = "owner-money";
+    amount.textContent = won(group.summary.amount);
+
+    var product = document.createElement("div");
+    product.className = "product-meta";
+    product.textContent = productText(group.summary);
+
+    button.appendChild(left);
+    button.appendChild(amount);
+    button.appendChild(product);
+
+    var detail = document.createElement("div");
+    detail.className = "detail-list";
+    group.items
+      .slice()
+      .sort(function(a,b){ return Number(b.createdAt || 0) - Number(a.createdAt || 0); })
+      .forEach(function(item){ detail.appendChild(reportCard(item)); });
+
+    card.appendChild(button);
+    card.appendChild(detail);
+    ownerCards.appendChild(card);
+  });
 }
 function renderTable(items) {
   rows.textContent = "";
-  items.forEach(function(x) {
-    var tr = document.createElement("tr");
-    var td0 = document.createElement("td");
-    var cb = document.createElement("input");
-    cb.type = "checkbox"; cb.className = "row-check"; cb.value = x.id; td0.appendChild(cb); tr.appendChild(td0);
-    add(tr, "td", x.date);
-    var tdOwner = document.createElement("td");
-    var ob = document.createElement("button");
-    ob.type = "button"; ob.className = "owner-link"; ob.setAttribute("data-owner", x.owner); ob.textContent = x.owner;
-    tdOwner.appendChild(ob); tr.appendChild(tdOwner);
-    add(tr, "td", x.client);
-    add(tr, "td", x.product);
-    var tdType = document.createElement("td");
-    var badge = document.createElement("span");
-    badge.className = "badge " + (x.type === "신규" ? "new" : "growth");
-    badge.textContent = x.type;
-    tdType.appendChild(badge); tr.appendChild(tdType);
-    add(tr, "td", won(x.amount));
-    var tdTool = document.createElement("td");
-    var edit = document.createElement("button");
-    edit.type = "button"; edit.className = "btn edit-btn"; edit.setAttribute("data-id", x.id); edit.textContent = "수정";
-    var del = document.createElement("button");
-    del.type = "button"; del.className = "btn danger delete-btn"; del.setAttribute("data-id", x.id); del.textContent = "삭제";
-    tdTool.appendChild(edit); tdTool.appendChild(document.createTextNode(" ")); tdTool.appendChild(del); tr.appendChild(tdTool);
-    rows.appendChild(tr);
-  });
+  items
+    .slice()
+    .sort(function(a,b){ return Number(b.createdAt || 0) - Number(a.createdAt || 0); })
+    .forEach(function(item) {
+      var tr = document.createElement("tr");
+      [item.date, item.owner, item.client, item.product, item.type, won(item.amount)].forEach(function(text) {
+        var td = document.createElement("td");
+        td.textContent = text;
+        tr.appendChild(td);
+      });
+      var tools = document.createElement("td");
+      var edit = document.createElement("button");
+      edit.className = "btn";
+      edit.type = "button";
+      edit.textContent = "수정";
+      edit.addEventListener("click", function(){ startEdit(item); });
+      var del = document.createElement("button");
+      del.className = "btn danger";
+      del.type = "button";
+      del.textContent = "삭제";
+      del.addEventListener("click", function(){ deleteData(item.id).catch(function(error){ status("삭제 실패: " + error.message, "error"); toast(error.message); }); });
+      tools.appendChild(edit);
+      tools.appendChild(document.createTextNode(" "));
+      tools.appendChild(del);
+      tr.appendChild(tools);
+      rows.appendChild(tr);
+    });
 }
 function render() {
-  var visible = filtered().sort(function(a,b){ return Number(b.createdAt || 0) - Number(a.createdAt || 0); });
-  var total = visible.reduce(function(s,x){ return s + Number(x.amount || 0); }, 0);
-  document.getElementById("resultLabel").textContent = label();
-  document.getElementById("resultTotal").textContent = visible.length + "건";
-  document.getElementById("amountTotal").textContent = money.format(total) + "원";
-  renderOwners("dateSummary", reports.filter(function(x){ return x.date === selectedDate; }), "선택한 날짜에 입력 없음");
-  renderOwners("ownerSummary", selectedOwnerMonth === "all" ? reports : reports.filter(function(x){ return monthOf(x) === selectedOwnerMonth; }), "담당자별 입력 없음");
-  renderMonthGroups(visible);
-  document.getElementById("datePanel").classList.toggle("active", activeView === "date");
-  document.getElementById("ownerPanel").classList.toggle("active", activeView === "owner");
-  renderTable(visible);
-  document.getElementById("empty").style.display = visible.length ? "none" : "block";
-}
-function resetForm() {
-  editingId = "";
-  form.reset();
-  ownerInput.value = localStorage.getItem("ownerName") || "";
-  dateInput.value = todayText;
-  selectedType = "신규";
-  document.querySelectorAll("[data-type]").forEach(function(b){ b.classList.toggle("active", b.dataset.type === "신규"); });
-  document.getElementById("submitBtn").textContent = "저장";
+  var items = monthItems();
+  var summary = summarize(items);
+  document.getElementById("monthLabel").textContent = selectedMonthLabel();
+  document.getElementById("totalCount").textContent = items.length + "건";
+  document.getElementById("totalAmount").textContent = won(summary.amount);
+  document.getElementById("newCount").textContent = summary.newCount + "건";
+  document.getElementById("growthCount").textContent = summary.growthCount + "건";
+  document.getElementById("empty").style.display = items.length ? "none" : "block";
+  renderOwnerCards(items);
+  renderTable(items);
 }
 
-amountInput.addEventListener("input", function(){ amountInput.value = digits(amountInput.value) ? money.format(Number(digits(amountInput.value))) : ""; });
-document.querySelectorAll("[data-type]").forEach(function(b) {
-  b.addEventListener("click", function(){ selectedType = b.dataset.type; document.querySelectorAll("[data-type]").forEach(function(x){ x.classList.remove("active"); }); b.classList.add("active"); });
+function resetAfterSave() {
+  editingId = "";
+  clientInput.value = "";
+  productInput.value = "";
+  amountInput.value = "";
+  updateAmountPreview();
+  document.getElementById("submitBtn").textContent = "저장";
+  clientInput.focus();
+}
+function resetFormAll() {
+  editingId = "";
+  clientInput.value = "";
+  productInput.value = "";
+  amountInput.value = "";
+  dateInput.value = todayText;
+  selectedType = "신규";
+  document.querySelectorAll("[data-type]").forEach(function(button) {
+    button.classList.toggle("active", button.dataset.type === selectedType);
+  });
+  updateAmountPreview();
+  document.getElementById("submitBtn").textContent = "저장";
+}
+function startEdit(item) {
+  editingId = item.id;
+  ownerInput.value = item.owner;
+  dateInput.value = item.date;
+  clientInput.value = item.client;
+  productInput.value = item.product;
+  amountInput.value = String(Math.round(Number(item.amount || 0) / 10000));
+  selectedType = item.type;
+  document.querySelectorAll("[data-type]").forEach(function(button) {
+    button.classList.toggle("active", button.dataset.type === selectedType);
+  });
+  updateAmountPreview();
+  document.getElementById("submitBtn").textContent = "수정 저장";
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+amountInput.addEventListener("input", function() {
+  amountInput.value = digits(amountInput.value);
+  updateAmountPreview();
 });
-document.querySelectorAll(".tab").forEach(function(b) {
-  b.addEventListener("click", function(){ activeView = b.dataset.view; selectedOwner = ""; document.querySelectorAll(".tab").forEach(function(x){ x.classList.remove("active"); }); b.classList.add("active"); render(); });
+document.querySelectorAll("[data-amount]").forEach(function(button) {
+  button.addEventListener("click", function() {
+    amountInput.value = button.dataset.amount;
+    updateAmountPreview();
+  });
 });
-dateSelect.addEventListener("change", function(){ selectedDate = dateSelect.value; selectedOwner = ""; render(); });
-document.getElementById("prevDateBtn").addEventListener("click", function(){ selectedDate = shiftDate(selectedDate, -1); dateSelect.value = selectedDate; selectedOwner = ""; render(); });
-document.getElementById("nextDateBtn").addEventListener("click", function(){ selectedDate = shiftDate(selectedDate, 1); dateSelect.value = selectedDate; selectedOwner = ""; render(); });
-ownerMonth.addEventListener("change", function(){ selectedOwnerMonth = ownerMonth.value; selectedOwner = ""; render(); });
-document.getElementById("dateSummary").addEventListener("click", function(e){ var b = e.target.closest("[data-owner]"); if (!b) return; selectedOwner = selectedOwner === b.dataset.owner ? "" : b.dataset.owner; render(); });
-document.getElementById("ownerSummary").addEventListener("click", function(e){ var b = e.target.closest("[data-owner]"); if (!b) return; selectedOwner = selectedOwner === b.dataset.owner ? "" : b.dataset.owner; render(); });
+document.querySelectorAll("[data-date-quick]").forEach(function(button) {
+  button.addEventListener("click", function() {
+    dateInput.value = button.dataset.dateQuick === "yesterday" ? shiftedDate(-1) : todayText;
+  });
+});
+document.querySelectorAll("[data-type]").forEach(function(button) {
+  button.addEventListener("click", function() {
+    selectedType = button.dataset.type;
+    document.querySelectorAll("[data-type]").forEach(function(item) { item.classList.remove("active"); });
+    button.classList.add("active");
+  });
+});
+document.getElementById("prevMonthBtn").addEventListener("click", function(){ moveMonth(-1); });
+document.getElementById("nextMonthBtn").addEventListener("click", function(){ moveMonth(1); });
+document.getElementById("currentMonthBtn").addEventListener("click", resetToCurrentMonth);
+document.getElementById("cancelEditBtn").addEventListener("click", resetFormAll);
+document.getElementById("stickySubmitBtn").addEventListener("click", function(){ form.requestSubmit(); });
+
 form.addEventListener("submit", async function(e) {
   e.preventDefault();
   var owner = ownerInput.value.trim();
   if (!owner) { toast("담당자 이름을 입력해주세요."); return; }
+  if (!clientInput.value.trim()) { toast("거래처명을 입력해주세요."); clientInput.focus(); return; }
+  if (!productInput.value) { toast("품목을 선택해주세요."); productInput.focus(); return; }
+  if (!amountMan(amountInput.value)) { toast("예상 금액을 만원 단위로 입력해주세요."); amountInput.focus(); return; }
+
   localStorage.setItem("ownerName", owner);
   var old = reports.find(function(x){ return x.id === editingId; }) || {};
-  var item = { id: editingId || makeId(), createdAt: editingId ? (old.createdAt || Date.now()) : Date.now(), updatedAt: Date.now(), date: dateInput.value, owner: owner, client: clientInput.value.trim(), type: selectedType, product: productInput.value, amount: parseAmount(amountInput.value) };
-  var wasEditing = !!editingId;
-  resetForm();
+  var item = {
+    id: editingId || makeId(),
+    createdAt: editingId ? (old.createdAt || Date.now()) : Date.now(),
+    updatedAt: Date.now(),
+    date: dateInput.value,
+    owner: owner,
+    client: clientInput.value.trim(),
+    type: selectedType,
+    product: productInput.value,
+    amount: amountWon(amountInput.value)
+  };
+  var wasEditing = Boolean(editingId);
   try {
     if (wasEditing) await updateData(item);
     else await addData(item);
+    resetAfterSave();
   } catch (error) {
+    status("저장 실패: " + error.message, "error");
     toast(error.message);
   }
 });
-document.getElementById("cancelEditBtn").addEventListener("click", function(){ resetForm(); });
-rows.addEventListener("click", async function(e) {
-  var ownerBtn = e.target.closest(".owner-link");
-  var editBtn = e.target.closest(".edit-btn");
-  var deleteBtn = e.target.closest(".delete-btn");
-  if (ownerBtn) { activeView = "owner"; selectedOwner = ownerBtn.dataset.owner; document.querySelectorAll(".tab").forEach(function(x){ x.classList.toggle("active", x.dataset.view === "owner"); }); render(); return; }
-  if (editBtn) {
-    var item = reports.find(function(x){ return x.id === editBtn.dataset.id; });
-    if (!item) return;
-    editingId = item.id; ownerInput.value = item.owner; dateInput.value = item.date; clientInput.value = item.client; productInput.value = item.product; amountInput.value = money.format(Number(item.amount || 0)); selectedType = item.type;
-    document.querySelectorAll("[data-type]").forEach(function(b){ b.classList.toggle("active", b.dataset.type === selectedType); });
-    document.getElementById("submitBtn").textContent = "수정 저장";
-  }
-  if (deleteBtn) {
-    if (!confirm("삭제할까요?")) return;
-    try { await deleteData(deleteBtn.dataset.id); } catch (error) { toast(error.message); }
-  }
-});
-document.getElementById("selectAll").addEventListener("change", function(e){ document.querySelectorAll(".row-check").forEach(function(c){ c.checked = e.target.checked; }); });
-document.getElementById("deleteSelectedBtn").addEventListener("click", async function() {
-  var ids = Array.prototype.map.call(document.querySelectorAll(".row-check:checked"), function(c){ return c.value; });
-  if (!ids.length) { toast("선택한 보고가 없습니다."); return; }
-  if (!confirm(ids.length + "건을 삭제할까요?")) return;
-  try { await deleteSelectedData(ids); } catch (error) { toast(error.message); }
-});
-document.getElementById("clearBtn").addEventListener("click", function(){ toast("전체 삭제는 Supabase 테이블에서 직접 처리해주세요."); });
+
 document.getElementById("exportBtn").addEventListener("click", function() {
-  var data = [["날짜","월","담당자","거래처명","구분","품목","예상 금액"]];
-  reports.forEach(function(x){ data.push([x.date, monthOf(x) + "월", x.owner, x.client, x.type, x.product, x.amount]); });
+  var data = [["날짜","담당자","거래처명","구분","품목","예상 금액"]];
+  monthItems().forEach(function(x){ data.push([x.date, x.owner, x.client, x.type, x.product, x.amount]); });
   var csv = data.map(function(row){ return row.map(function(cell){ return '"' + String(cell || "").replace(/"/g, '""') + '"'; }).join(","); }).join("\n");
   var blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" });
   var url = URL.createObjectURL(blob);
-  var a = document.createElement("a"); a.href = url; a.download = "영업일일보고_" + todayText + ".csv"; a.click(); URL.revokeObjectURL(url);
+  var a = document.createElement("a");
+  a.href = url;
+  a.download = "영업일일보고_" + selectedYear + "-" + String(selectedMonth).padStart(2, "0") + ".csv";
+  a.click();
+  URL.revokeObjectURL(url);
 });
-loadData().catch(function(error){ toast(error.message); });
+
+updateAmountPreview();
+loadData().catch(function(error){ status("연결 실패: " + error.message, "error"); toast(error.message); });

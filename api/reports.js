@@ -1,6 +1,14 @@
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
+function cleanSupabaseUrl() {
+  if (!SUPABASE_URL) return "";
+  return SUPABASE_URL
+    .trim()
+    .replace(/\/rest\/v1\/?$/i, "")
+    .replace(/\/+$/g, "");
+}
+
 function json(res, status, data) {
   res.statusCode = status;
   res.setHeader("Content-Type", "application/json; charset=utf-8");
@@ -8,11 +16,17 @@ function json(res, status, data) {
 }
 
 async function supabase(path, options = {}) {
-  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+  const baseUrl = cleanSupabaseUrl();
+
+  if (!baseUrl || !SUPABASE_SERVICE_ROLE_KEY) {
     throw new Error("Supabase environment variables are missing.");
   }
 
-  const response = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+  if (!/^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(baseUrl)) {
+    throw new Error("SUPABASE_URL must look like https://xxxx.supabase.co");
+  }
+
+  const response = await fetch(`${baseUrl}/rest/v1/${path}`, {
     ...options,
     headers: {
       apikey: SUPABASE_SERVICE_ROLE_KEY,
@@ -81,6 +95,20 @@ async function readBody(req) {
 
 module.exports = async function handler(req, res) {
   try {
+    const requestUrl = new URL(req.url, "http://localhost");
+
+    if (req.method === "GET" && requestUrl.searchParams.get("debug") === "1") {
+      const baseUrl = cleanSupabaseUrl();
+      return json(res, 200, {
+        ok: true,
+        hasSupabaseUrl: Boolean(baseUrl),
+        hasServiceRoleKey: Boolean(SUPABASE_SERVICE_ROLE_KEY),
+        supabaseUrlLooksRight: /^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(baseUrl),
+        supabaseUrlStart: baseUrl ? baseUrl.slice(0, 28) : "",
+        message: "Both values must be true. Do not share the service role key."
+      });
+    }
+
     if (req.method === "GET") {
       const rows = await supabase("reports?select=*&order=created_at.desc");
       return json(res, 200, rows.map(fromDb));
@@ -110,8 +138,7 @@ module.exports = async function handler(req, res) {
     }
 
     if (req.method === "DELETE") {
-      const url = new URL(req.url, "http://localhost");
-      const ids = url.searchParams.getAll("id");
+      const ids = requestUrl.searchParams.getAll("id");
       if (!ids.length) return json(res, 400, { error: "id is required" });
 
       for (const id of ids) {
