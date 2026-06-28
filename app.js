@@ -24,6 +24,7 @@ var monthPicker = document.getElementById("monthPicker");
 
 dateInput.value = todayText;
 ownerInput.value = localStorage.getItem("ownerName") || "";
+productInput.value = "클로르";
 
 function dateText(d) {
   return [
@@ -183,6 +184,13 @@ function groupByOwner(items) {
   return Object.keys(map).sort().map(function(owner) {
     return { owner: owner, items: map[owner], summary: summarize(map[owner]) };
   });
+}
+function ownerCount(items) {
+  var names = {};
+  items.forEach(function(item) {
+    if (item.owner) names[item.owner] = true;
+  });
+  return Object.keys(names).length;
 }
 
 function prescriptionButton(item) {
@@ -345,7 +353,8 @@ function renderOwnerCards(items) {
 function render() {
   var items = monthlyItems();
   var summary = summarize(items);
-  var doneRate = summary.total.count ? Math.round(summary.done / summary.total.count * 100) : 0;
+  var targetAmount = ownerCount(items) * 2000000;
+  var achievementRate = targetAmount ? Math.round(summary.total.amount / targetAmount * 100) : 0;
 
   document.getElementById("monthLabel").textContent = selectedMonthLabel();
   syncMonthPicker();
@@ -355,15 +364,15 @@ function render() {
   document.getElementById("newCount").textContent = summary.new.count + "건";
   document.getElementById("growthAmount").textContent = won(summary.growth.amount);
   document.getElementById("growthCount").textContent = summary.growth.count + "건";
-  document.getElementById("doneRate").textContent = doneRate + "%";
-  document.getElementById("doneCount").textContent = summary.done + " / " + summary.total.count + "건";
+  document.getElementById("doneRate").textContent = achievementRate + "%";
+  document.getElementById("doneCount").textContent = "목표 " + won(targetAmount);
   document.getElementById("empty").style.display = items.length ? "none" : "block";
   renderOwnerCards(items);
 }
 function resetAfterSave() {
   editingId = "";
   clientInput.value = "";
-  productInput.value = "";
+  productInput.value = "클로르";
   amountInput.value = "";
   selectedType = "신규";
   updateTypeButtons();
@@ -374,7 +383,7 @@ function resetAfterSave() {
 function resetFormAll() {
   editingId = "";
   clientInput.value = "";
-  productInput.value = "";
+  productInput.value = "클로르";
   amountInput.value = "";
   dateInput.value = todayText;
   selectedType = "신규";
