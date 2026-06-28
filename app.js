@@ -20,7 +20,6 @@ var amountPreview = document.getElementById("amountPreview");
 var ownerCards = document.getElementById("ownerCards");
 var rows = document.getElementById("rows");
 var statusBox = document.getElementById("statusBox");
-var products = ["3제+클로르", "3제", "클로르"];
 
 dateInput.value = todayText;
 ownerInput.value = localStorage.getItem("ownerName") || "";
@@ -112,29 +111,24 @@ function monthItems() {
     return yearOf(x) === selectedYear && monthOf(x) === selectedMonth;
   });
 }
-function blankProductMap() {
-  var map = {};
-  products.forEach(function(name){ map[name] = { count: 0, amount: 0 }; });
-  return map;
-}
 function summarize(items) {
   return items.reduce(function(acc, item) {
     var amount = Number(item.amount || 0);
     acc.total.count += 1;
     acc.total.amount += amount;
     if (item.prescriptionDone) acc.done += 1;
-
-    var bucket = item.type === "신규" ? acc.new : acc.growth;
-    bucket.count += 1;
-    bucket.amount += amount;
-    if (!bucket.products[item.product]) bucket.products[item.product] = { count: 0, amount: 0 };
-    bucket.products[item.product].count += 1;
-    bucket.products[item.product].amount += amount;
+    if (item.type === "신규") {
+      acc.new.count += 1;
+      acc.new.amount += amount;
+    } else {
+      acc.growth.count += 1;
+      acc.growth.amount += amount;
+    }
     return acc;
   }, {
     total: { count: 0, amount: 0 },
-    new: { count: 0, amount: 0, products: blankProductMap() },
-    growth: { count: 0, amount: 0, products: blankProductMap() },
+    new: { count: 0, amount: 0 },
+    growth: { count: 0, amount: 0 },
     done: 0
   });
 }
@@ -150,34 +144,6 @@ function groupByOwner(items) {
   }).map(function(owner) {
     return { owner: owner, items: map[owner], summary: summarize(map[owner]) };
   });
-}
-function productLines(summaryPart) {
-  return products.map(function(name) {
-    var item = summaryPart.products[name] || { count: 0, amount: 0 };
-    return name + " " + item.count + "건 / " + won(item.amount);
-  });
-}
-function renderProductBreakdown(targetId, summaryPart) {
-  var box = document.getElementById(targetId);
-  box.textContent = "";
-  productLines(summaryPart).forEach(function(text) {
-    var line = document.createElement("div");
-    line.className = "product-line";
-    var parts = text.split(" / ");
-    var left = document.createElement("span");
-    left.textContent = parts[0];
-    var right = document.createElement("strong");
-    right.textContent = parts[1];
-    line.appendChild(left);
-    line.appendChild(right);
-    box.appendChild(line);
-  });
-}
-function ownerProductText(summary) {
-  return [
-    "신규: " + productLines(summary.new).join(" · "),
-    "증대: " + productLines(summary.growth).join(" · ")
-  ];
 }
 function prescriptionButton(item) {
   var button = document.createElement("button");
@@ -240,11 +206,24 @@ function reportCard(item) {
   card.appendChild(actions);
   return card;
 }
+function addDetailMetric(parent, label, value, sub) {
+  var box = document.createElement("div");
+  box.className = "detail-metric";
+  var span = document.createElement("span");
+  span.textContent = label;
+  var strong = document.createElement("strong");
+  strong.textContent = value;
+  var small = document.createElement("span");
+  small.textContent = sub;
+  box.appendChild(span);
+  box.appendChild(strong);
+  box.appendChild(small);
+  parent.appendChild(box);
+}
 function renderOwnerCards(items) {
   ownerCards.textContent = "";
   groupByOwner(items).forEach(function(group) {
     var summary = group.summary;
-    var pending = summary.total.count - summary.done;
     var card = document.createElement("div");
     card.className = "owner-card" + (openedOwner === group.owner ? " open" : "");
 
@@ -256,34 +235,19 @@ function renderOwnerCards(items) {
       render();
     });
 
-    var left = document.createElement("div");
     var name = document.createElement("div");
     name.className = "owner-name";
     name.textContent = group.owner;
-    var meta = document.createElement("div");
-    meta.className = "owner-meta";
-    meta.innerHTML =
-      "<span>신규 " + summary.new.count + "건 / " + won(summary.new.amount) + "</span>" +
-      "<span>매출증대 " + summary.growth.count + "건 / " + won(summary.growth.amount) + "</span>" +
-      "<span>처방입력 완료 " + summary.done + "건 / 미완료 " + pending + "건</span>";
-    left.appendChild(name);
-    left.appendChild(meta);
+    var line = document.createElement("div");
+    line.className = "owner-line";
+    line.textContent = "신규 " + summary.new.count + "건  증대 " + summary.growth.count + "건  " + won(summary.total.amount);
+    button.appendChild(name);
+    button.appendChild(line);
 
-    var amount = document.createElement("div");
-    amount.className = "owner-money";
-    amount.textContent = won(summary.total.amount);
-
-    var product = document.createElement("div");
-    product.className = "product-meta";
-    ownerProductText(summary).forEach(function(text) {
-      var line = document.createElement("div");
-      line.textContent = text;
-      product.appendChild(line);
-    });
-
-    button.appendChild(left);
-    button.appendChild(amount);
-    button.appendChild(product);
+    var detailSummary = document.createElement("div");
+    detailSummary.className = "owner-detail-summary";
+    addDetailMetric(detailSummary, "신규", won(summary.new.amount), summary.new.count + "건");
+    addDetailMetric(detailSummary, "매출증대", won(summary.growth.amount), summary.growth.count + "건");
 
     var detail = document.createElement("div");
     detail.className = "detail-list";
@@ -293,6 +257,7 @@ function renderOwnerCards(items) {
       .forEach(function(item){ detail.appendChild(reportCard(item)); });
 
     card.appendChild(button);
+    card.appendChild(detailSummary);
     card.appendChild(detail);
     ownerCards.appendChild(card);
   });
@@ -312,7 +277,6 @@ function renderTable(items) {
       var doneTd = document.createElement("td");
       doneTd.appendChild(prescriptionButton(item));
       tr.appendChild(doneTd);
-
       var tools = document.createElement("td");
       var edit = document.createElement("button");
       edit.className = "btn";
@@ -345,12 +309,9 @@ function render() {
   document.getElementById("doneRate").textContent = doneRate + "%";
   document.getElementById("doneCount").textContent = summary.done + " / " + summary.total.count + "건";
   document.getElementById("empty").style.display = items.length ? "none" : "block";
-  renderProductBreakdown("newProductBreakdown", summary.new);
-  renderProductBreakdown("growthProductBreakdown", summary.growth);
   renderOwnerCards(items);
   renderTable(items);
 }
-
 function resetAfterSave() {
   editingId = "";
   clientInput.value = "";

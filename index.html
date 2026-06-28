@@ -27,7 +27,7 @@
     h2 { margin: 0; font-size: 17px; }
     button, input, select { font: inherit; }
     main { max-width: 1120px; margin: 0 auto; padding: 14px; display: grid; grid-template-columns: 360px 1fr; gap: 14px; }
-    section, .metric, .owner-card, .report-card, .breakdown-card {
+    section, .metric, .owner-card, .report-card {
       background: var(--panel);
       border: 1px solid var(--line);
       border-radius: 8px;
@@ -62,19 +62,29 @@
     .metric small { color: var(--muted); font-size: 13px; }
     .month-nav { display: grid; grid-template-columns: auto 1fr auto auto; gap: 8px; align-items: center; }
     .month-label { min-height: 42px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 8px; background: #fff; font-weight: 800; }
-    .breakdown { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-    .breakdown-card { box-shadow: none; padding: 12px; display: grid; gap: 8px; }
-    .breakdown-card h3 { margin: 0; font-size: 15px; }
-    .product-line { display: flex; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 13px; border-top: 1px solid #eef3f0; padding-top: 7px; }
-    .owner-grid { display: grid; gap: 10px; }
-    .owner-card { box-shadow: none; overflow: hidden; }
-    .owner-button { width: 100%; border: 0; background: #fff; padding: 14px; display: grid; grid-template-columns: 1fr auto; gap: 8px; text-align: left; cursor: pointer; }
+    .owner-grid { display: grid; gap: 1px; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--line); }
+    .owner-card { box-shadow: none; border: 0; border-radius: 0; overflow: hidden; }
+    .owner-button {
+      width: 100%;
+      min-height: 46px;
+      border: 0;
+      background: #fff;
+      padding: 10px 12px;
+      display: grid;
+      grid-template-columns: minmax(70px, 1fr) auto;
+      gap: 8px;
+      align-items: center;
+      text-align: left;
+      cursor: pointer;
+    }
     .owner-button.active { background: var(--green-soft); }
-    .owner-name { font-size: 17px; font-weight: 900; color: #0f5b47; }
-    .owner-money { font-size: 20px; font-weight: 900; }
-    .owner-meta, .product-meta { color: var(--muted); font-size: 13px; }
-    .owner-meta { display: grid; gap: 3px; }
-    .product-meta { grid-column: 1 / -1; display: grid; gap: 4px; }
+    .owner-name { font-size: 15px; font-weight: 900; color: var(--text); }
+    .owner-line { font-size: 15px; color: var(--text); white-space: nowrap; }
+    .owner-detail-summary { display: none; grid-template-columns: 1fr 1fr; gap: 8px; padding: 10px; border-top: 1px solid var(--line); background: #fbfdfc; }
+    .owner-card.open .owner-detail-summary { display: grid; }
+    .detail-metric { border: 1px solid var(--line); border-radius: 8px; background: #fff; padding: 10px; display: grid; gap: 4px; }
+    .detail-metric span { color: var(--muted); font-size: 12px; }
+    .detail-metric strong { font-size: 16px; }
     .detail-list { display: none; border-top: 1px solid var(--line); padding: 10px; gap: 8px; background: #fbfdfc; }
     .owner-card.open .detail-list { display: grid; }
     .report-card { box-shadow: none; padding: 12px; display: grid; gap: 9px; }
@@ -95,9 +105,12 @@
     @media (max-width: 900px) {
       main { display: block; padding-bottom: 88px; }
       .dashboard { margin-top: 14px; }
-      .summary, .breakdown { grid-template-columns: 1fr 1fr; }
+      .summary { grid-template-columns: 1fr 1fr; }
       .row, .month-nav { grid-template-columns: 1fr; }
       .quick-row { grid-template-columns: repeat(3, 1fr); }
+      .owner-button { grid-template-columns: 70px 1fr; }
+      .owner-line { text-align: right; font-size: 14px; }
+      .owner-detail-summary { grid-template-columns: 1fr; }
       .desktop-table, .tools { display: none; }
       .sticky-save { display: block; position: sticky; bottom: 0; z-index: 4; background: rgba(244,247,245,.94); backdrop-filter: blur(8px); padding-top: 8px; }
       .form > #submitBtn { display: none; }
@@ -166,16 +179,6 @@
             <div class="month-label" id="monthLabel">이번 달</div>
             <button class="btn" type="button" id="currentMonthBtn">현재</button>
             <button class="btn" type="button" id="nextMonthBtn">다음 달</button>
-          </div>
-          <div class="breakdown">
-            <div class="breakdown-card">
-              <h3>신규 품목</h3>
-              <div id="newProductBreakdown"></div>
-            </div>
-            <div class="breakdown-card">
-              <h3>매출증대 품목</h3>
-              <div id="growthProductBreakdown"></div>
-            </div>
           </div>
           <div class="owner-grid" id="ownerCards"></div>
           <div class="empty" id="empty">아직 입력된 보고가 없습니다.</div>
