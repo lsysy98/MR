@@ -207,9 +207,13 @@ function prescriptionButton(item) {
   });
   return button;
 }
-function reportCard(item) {
+function reportCard(item, index) {
   var card = document.createElement("div");
-  card.className = "report-card";
+  card.className = "report-card " + typeClass(item.type);
+
+  var number = document.createElement("div");
+  number.className = "report-number";
+  number.textContent = String(index + 1);
 
   var top = document.createElement("div");
   top.className = "report-top";
@@ -258,6 +262,7 @@ function reportCard(item) {
   bottom.appendChild(badge);
   bottom.appendChild(actions);
 
+  card.appendChild(number);
   card.appendChild(top);
   card.appendChild(bottom);
   return card;
@@ -333,8 +338,8 @@ function renderOwnerCards(items) {
       .filter(function(item) { return !filterType || item.type === filterType; })
       .slice()
       .sort(function(a, b) { return Number(b.createdAt || 0) - Number(a.createdAt || 0); })
-      .forEach(function(item) {
-        detail.appendChild(reportCard(item));
+      .forEach(function(item, index) {
+        detail.appendChild(reportCard(item, index));
       });
 
     if (!detail.children.length) {
