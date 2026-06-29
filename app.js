@@ -10,6 +10,7 @@ var selectedType = "신규";
 var openedOwner = "";
 var ownerFilters = {};
 var editingId = "";
+var ownerNames = ["성진욱", "김무영", "이승엽", "김태홍", "제성규", "송진영", "이현욱"];
 
 var form = document.getElementById("reportForm");
 var ownerInput = document.getElementById("owner");
@@ -23,7 +24,8 @@ var statusBox = document.getElementById("statusBox");
 var monthPicker = document.getElementById("monthPicker");
 
 dateInput.value = todayText;
-ownerInput.value = localStorage.getItem("ownerName") || "";
+var savedOwnerName = localStorage.getItem("ownerName") || "";
+ownerInput.value = ownerNames.indexOf(savedOwnerName) >= 0 ? savedOwnerName : "";
 productInput.value = "클로르";
 
 function dateText(d) {
@@ -168,26 +170,23 @@ function summarize(items) {
 }
 function monthlyItems() {
   return reports.filter(function(item) {
-    return yearOf(item) === selectedYear && monthOf(item) === selectedMonth;
+    return yearOf(item) === selectedYear && monthOf(item) === selectedMonth && ownerNames.indexOf(item.owner) >= 0;
   });
 }
 function groupByOwner(items) {
   var map = {};
-  items.forEach(function(item) {
-    var owner = item.owner || "담당자 없음";
-    if (!map[owner]) map[owner] = [];
-    map[owner].push(item);
+  ownerNames.forEach(function(owner) {
+    map[owner] = [];
   });
-  return Object.keys(map).sort().map(function(owner) {
+  items.forEach(function(item) {
+    if (map[item.owner]) map[item.owner].push(item);
+  });
+  return ownerNames.map(function(owner) {
     return { owner: owner, items: map[owner], summary: summarize(map[owner]) };
   });
 }
 function ownerCount(items) {
-  var names = {};
-  items.forEach(function(item) {
-    if (item.owner) names[item.owner] = true;
-  });
-  return Object.keys(names).length;
+  return ownerNames.length;
 }
 
 function prescriptionButton(item) {

@@ -176,7 +176,18 @@
     <section class="input-panel">
       <div class="head"><h2>거래처 입력</h2></div>
       <form class="form" id="reportForm">
-        <label>담당자 이름 <input id="owner" type="text" required></label>
+        <label>담당자 이름
+          <select id="owner" required>
+            <option value="">선택</option>
+            <option value="성진욱">성진욱</option>
+            <option value="김무영">김무영</option>
+            <option value="이승엽">이승엽</option>
+            <option value="김태홍">김태홍</option>
+            <option value="제성규">제성규</option>
+            <option value="송진영">송진영</option>
+            <option value="이현욱">이현욱</option>
+          </select>
+        </label>
         <label>날짜 <input id="date" type="date" required></label>
         <label>거래처명 <input id="client" type="text" required autocomplete="off"></label>
         <label>구분
