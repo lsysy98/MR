@@ -365,7 +365,7 @@ function render() {
   document.getElementById("growthAmount").textContent = won(summary.growth.amount);
   document.getElementById("growthCount").textContent = summary.growth.count + "건";
   document.getElementById("doneRate").textContent = achievementRate + "%";
-  document.getElementById("doneCount").textContent = "목표 " + won(targetAmount);
+  document.getElementById("doneCount").textContent = "총매출 " + won(summary.total.amount) + " / 목표 " + won(targetAmount);
   document.getElementById("empty").style.display = items.length ? "none" : "block";
   renderOwnerCards(items);
 }
@@ -426,6 +426,9 @@ document.getElementById("nextMonthBtn").addEventListener("click", function() { m
 document.getElementById("currentMonthBtn").addEventListener("click", resetToCurrentMonth);
 document.getElementById("cancelEditBtn").addEventListener("click", resetFormAll);
 document.getElementById("stickySubmitBtn").addEventListener("click", function() { form.requestSubmit(); });
+document.getElementById("jumpDashboardBtn").addEventListener("click", function() {
+  document.getElementById("dashboard").scrollIntoView({ behavior: "smooth", block: "start" });
+});
 monthPicker.addEventListener("change", function() {
   if (!monthPicker.value) return;
   var parts = monthPicker.value.split("-");
