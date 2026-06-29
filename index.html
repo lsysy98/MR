@@ -55,15 +55,17 @@
     .status { border: 1px solid #cbd8d1; border-radius: 8px; padding: 10px 12px; background: #fbfdfc; color: var(--muted); font-size: 13px; }
     .status.ok { border-color: #98d8bf; background: #ecf9f3; color: #0f5b47; }
     .status.error { border-color: #efb8b8; background: #fff1f1; color: #b42323; }
-    .summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 14px; }
+    .mobile-tabs { display: none; }
+    .summary-title { margin: 2px 0 -2px; color: var(--muted); font-size: 14px; font-weight: 800; }
+    .summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
     .metric { padding: 14px; min-height: 92px; display: grid; gap: 6px; align-content: space-between; }
     .metric span { color: var(--muted); font-size: 13px; }
     .metric strong { font-size: 22px; }
     .metric small { color: var(--muted); font-size: 13px; }
     .month-nav { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; }
-    .month-main { display: grid; grid-template-columns: 1fr 170px; gap: 8px; align-items: center; }
+    .month-main { display: grid; grid-template-columns: minmax(180px, 240px); gap: 8px; align-items: center; }
     .month-actions { display: flex; gap: 8px; align-items: center; }
-    .month-label { min-height: 42px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 8px; background: #fff; font-weight: 800; }
+    #monthPicker { font-weight: 800; text-align: center; }
     .owner-grid { display: grid; gap: 1px; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--line); }
     .owner-card { box-shadow: none; border: 0; border-radius: 0; overflow: hidden; }
     .owner-button {
@@ -126,6 +128,7 @@
     }
     .report-top { display: grid; gap: 4px; }
     .client { font-weight: 900; font-size: 16px; }
+    .report-amount { font-weight: 900; font-size: 24px; color: #10251d; line-height: 1.1; }
     .report-info { color: var(--muted); font-size: 13px; display: flex; gap: 8px; flex-wrap: wrap; }
     .report-bottom { display: flex; justify-content: space-between; gap: 8px; align-items: end; }
     .report-actions { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
@@ -133,11 +136,16 @@
     .badge.new { background: var(--blue-soft); color: var(--blue); }
     .badge.growth { background: var(--amber-soft); color: var(--amber); }
     .empty { color: var(--muted); text-align: center; padding: 24px 10px; border: 1px dashed #cbd8d1; border-radius: 8px; background: #fff; }
-    .sticky-save { display: none; }
     @media (max-width: 900px) {
-      main { display: block; padding: 14px 12px 96px; }
-      .input-panel, .dashboard { scroll-margin-top: 72px; }
-      .dashboard { margin-top: 22px; }
+      header { padding: 12px 12px 10px; }
+      .mobile-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 10px; padding: 4px; border: 1px solid #cbd8d1; border-radius: 8px; background: #f5f8f6; }
+      .mobile-tab { min-height: 38px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); font-weight: 800; cursor: pointer; }
+      .mobile-tab.active { background: var(--green); color: #fff; }
+      main { display: block; padding: 14px 12px 24px; }
+      body.view-dashboard .input-panel { display: none; }
+      body.view-form .dashboard { display: none; }
+      .input-panel, .dashboard { scroll-margin-top: 108px; }
+      .dashboard { margin-top: 0; }
       .summary { grid-template-columns: 1fr 1fr; }
       .row, .month-nav, .month-main { grid-template-columns: 1fr; }
       .month-actions { display: grid; grid-template-columns: repeat(3, 1fr); }
@@ -150,15 +158,20 @@
       .detail-reset { grid-column: 1 / -1; }
       .detail-list { padding: 10px; gap: 10px; }
       .report-card { padding: 11px 10px 11px 46px; }
+      .report-amount { font-size: 25px; }
       .report-bottom { align-items: start; }
       .report-actions .btn { min-height: 38px; padding: 0 10px; }
-      .sticky-save { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; position: sticky; bottom: 0; z-index: 4; background: rgba(244,247,245,.94); backdrop-filter: blur(8px); padding-top: 8px; }
-      .form > #submitBtn { display: none; }
     }
   </style>
 </head>
-<body>
-  <header><h1>영업 일일보고</h1></header>
+<body class="view-dashboard">
+  <header>
+    <h1>영업 일일보고</h1>
+    <div class="mobile-tabs" aria-label="화면 선택">
+      <button class="mobile-tab" type="button" data-view="form">작성하기</button>
+      <button class="mobile-tab active" type="button" data-view="dashboard">보고현황</button>
+    </div>
+  </header>
   <main>
     <section class="input-panel">
       <div class="head"><h2>거래처 입력</h2></div>
@@ -198,28 +211,17 @@
         <div class="helper" id="amountPreview">1 입력 = 10,000원</div>
         <button class="btn primary" id="submitBtn" type="submit">저장</button>
         <button class="btn" id="cancelEditBtn" type="button">입력 초기화</button>
-        <div class="sticky-save">
-          <button class="btn primary" id="stickySubmitBtn" type="button">저장</button>
-          <button class="btn" id="jumpDashboardBtn" type="button">보고현황</button>
-        </div>
         <div class="toast" id="toast"></div>
       </form>
     </section>
 
     <section class="dashboard" id="dashboard">
-      <div class="summary">
-        <div class="metric"><span>전체</span><strong id="totalAmount">0원</strong><small id="totalCount">0건</small></div>
-        <div class="metric"><span>신규</span><strong id="newAmount">0원</strong><small id="newCount">0건</small></div>
-        <div class="metric"><span>매출증대</span><strong id="growthAmount">0원</strong><small id="growthCount">0건</small></div>
-        <div class="metric"><span>목표 달성율</span><strong id="doneRate">0%</strong><small id="doneCount">총매출 0원 / 목표 0원</small></div>
-      </div>
       <section>
         <div class="head"><h2>담당자별 현황</h2></div>
         <div class="body">
           <div class="status" id="statusBox">연결 확인 중입니다.</div>
           <div class="month-nav">
             <div class="month-main">
-              <div class="month-label" id="monthLabel">이번 달</div>
               <input id="monthPicker" type="month" aria-label="월 선택">
             </div>
             <div class="month-actions">
@@ -232,6 +234,15 @@
           <div class="empty" id="empty">아직 입력된 보고가 없습니다.</div>
         </div>
       </section>
+      <div class="body">
+        <div class="summary-title">월 전체 요약</div>
+        <div class="summary">
+          <div class="metric"><span>전체</span><strong id="totalAmount">0원</strong><small id="totalCount">0건</small></div>
+          <div class="metric"><span>신규</span><strong id="newAmount">0원</strong><small id="newCount">0건</small></div>
+          <div class="metric"><span>매출증대</span><strong id="growthAmount">0원</strong><small id="growthCount">0건</small></div>
+          <div class="metric"><span>목표 달성율</span><strong id="doneRate">0%</strong><small id="doneCount">총매출 0원 / 목표 0원</small></div>
+        </div>
+      </div>
     </section>
   </main>
   <script src="app.js"></script>

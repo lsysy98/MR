@@ -83,9 +83,6 @@ function updateTypeButtons() {
 function syncMonthPicker() {
   if (monthPicker) monthPicker.value = monthValue();
 }
-function selectedMonthLabel() {
-  return selectedYear + "년 " + selectedMonth + "월";
-}
 function moveMonth(delta) {
   var d = new Date(selectedYear, selectedMonth - 1 + delta, 1);
   selectedYear = d.getFullYear();
@@ -220,10 +217,14 @@ function reportCard(item, index) {
   var client = document.createElement("div");
   client.className = "client";
   client.textContent = item.client;
+  var amount = document.createElement("div");
+  amount.className = "report-amount";
+  amount.textContent = won(item.amount);
   var info = document.createElement("div");
   info.className = "report-info";
-  info.textContent = item.date + " · " + item.product + " · " + won(item.amount);
+  info.textContent = item.date + " · " + item.product;
   top.appendChild(client);
+  top.appendChild(amount);
   top.appendChild(info);
 
   var bottom = document.createElement("div");
@@ -361,7 +362,6 @@ function render() {
   var targetAmount = ownerCount(items) * 2000000;
   var achievementRate = targetAmount ? Math.round(summary.total.amount / targetAmount * 100) : 0;
 
-  document.getElementById("monthLabel").textContent = selectedMonthLabel();
   syncMonthPicker();
   document.getElementById("totalAmount").textContent = won(summary.total.amount);
   document.getElementById("totalCount").textContent = summary.total.count + "건";
@@ -430,9 +430,16 @@ document.getElementById("prevMonthBtn").addEventListener("click", function() { m
 document.getElementById("nextMonthBtn").addEventListener("click", function() { moveMonth(1); });
 document.getElementById("currentMonthBtn").addEventListener("click", resetToCurrentMonth);
 document.getElementById("cancelEditBtn").addEventListener("click", resetFormAll);
-document.getElementById("stickySubmitBtn").addEventListener("click", function() { form.requestSubmit(); });
-document.getElementById("jumpDashboardBtn").addEventListener("click", function() {
-  document.getElementById("dashboard").scrollIntoView({ behavior: "smooth", block: "start" });
+document.querySelectorAll("[data-view]").forEach(function(button) {
+  button.addEventListener("click", function() {
+    var view = button.dataset.view;
+    document.body.classList.toggle("view-form", view === "form");
+    document.body.classList.toggle("view-dashboard", view === "dashboard");
+    document.querySelectorAll("[data-view]").forEach(function(tab) {
+      tab.classList.toggle("active", tab.dataset.view === view);
+    });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  });
 });
 monthPicker.addEventListener("change", function() {
   if (!monthPicker.value) return;
