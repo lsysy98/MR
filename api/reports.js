@@ -58,6 +58,8 @@ function toDb(item) {
     type: item.type,
     product: item.product,
     amount: Number(item.amount || 0),
+    collection_year: item.collectionYear ? Number(item.collectionYear) : null,
+    collection_month: item.collectionMonth ? Number(item.collectionMonth) : null,
     prescription_done: Boolean(item.prescriptionDone)
   };
 }
@@ -73,6 +75,8 @@ function fromDb(row) {
     type: row.type,
     product: row.product,
     amount: Number(row.amount || 0),
+    collectionYear: row.collection_year ? Number(row.collection_year) : null,
+    collectionMonth: row.collection_month ? Number(row.collection_month) : null,
     prescriptionDone: Boolean(row.prescription_done)
   };
 }

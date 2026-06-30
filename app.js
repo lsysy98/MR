@@ -5,6 +5,9 @@ var currentYear = today.getFullYear();
 var currentMonth = today.getMonth() + 1;
 var selectedYear = currentYear;
 var selectedMonth = currentMonth;
+var defaultCollection = nextCollectionMonth(today);
+var collectionYear = defaultCollection.year;
+var collectionMonth = defaultCollection.month;
 var reports = [];
 var selectedType = "신규";
 var openedOwner = "";
@@ -22,6 +25,7 @@ var amountPreview = document.getElementById("amountPreview");
 var ownerCards = document.getElementById("ownerCards");
 var statusBox = document.getElementById("statusBox");
 var monthPicker = document.getElementById("monthPicker");
+var collectionButtons = document.getElementById("collectionMonthButtons");
 
 dateInput.value = todayText;
 var savedOwnerName = localStorage.getItem("ownerName") || "";
@@ -34,6 +38,15 @@ function dateText(d) {
     String(d.getMonth() + 1).padStart(2, "0"),
     String(d.getDate()).padStart(2, "0")
   ].join("-");
+}
+function nextCollectionMonth(d) {
+  var year = d.getFullYear();
+  var month = d.getMonth() + 2;
+  if (month > 12) {
+    year += 1;
+    month = 1;
+  }
+  return { year: year, month: month };
 }
 function monthValue() {
   return selectedYear + "-" + String(selectedMonth).padStart(2, "0");
@@ -54,11 +67,17 @@ function won(v) {
   var n = Number(v || 0);
   return n ? money.format(n) + "원" : "0원";
 }
+function yearOf(x) {
+  return x.date ? Number(String(x.date).slice(0, 4)) : currentYear;
+}
 function monthOf(x) {
   return x.date ? Number(String(x.date).slice(5, 7)) : currentMonth;
 }
-function yearOf(x) {
-  return x.date ? Number(String(x.date).slice(0, 4)) : currentYear;
+function collectionYearOf(item) {
+  return Number(item.collectionYear || yearOf(item));
+}
+function collectionMonthOf(item) {
+  return Number(item.collectionMonth || monthOf(item));
 }
 function typeClass(type) {
   return type === "신규" ? "new" : "growth";
@@ -84,6 +103,23 @@ function updateTypeButtons() {
 }
 function syncMonthPicker() {
   if (monthPicker) monthPicker.value = monthValue();
+}
+function syncCollectionButtons() {
+  document.querySelectorAll("[data-collection-month]").forEach(function(button) {
+    button.classList.toggle("active", Number(button.dataset.collectionMonth) === collectionMonth);
+  });
+}
+function setCollectionMonth(month) {
+  collectionMonth = Number(month);
+  collectionYear = currentYear;
+  if (collectionMonth <= currentMonth) collectionYear += 1;
+  syncCollectionButtons();
+}
+function setDefaultCollectionMonth() {
+  var next = nextCollectionMonth(new Date());
+  collectionYear = next.year;
+  collectionMonth = next.month;
+  syncCollectionButtons();
 }
 function moveMonth(delta) {
   var d = new Date(selectedYear, selectedMonth - 1 + delta, 1);
@@ -170,7 +206,9 @@ function summarize(items) {
 }
 function monthlyItems() {
   return reports.filter(function(item) {
-    return yearOf(item) === selectedYear && monthOf(item) === selectedMonth && ownerNames.indexOf(item.owner) >= 0;
+    return collectionYearOf(item) === selectedYear &&
+      collectionMonthOf(item) === selectedMonth &&
+      ownerNames.indexOf(item.owner) >= 0;
   });
 }
 function groupByOwner(items) {
@@ -185,7 +223,7 @@ function groupByOwner(items) {
     return { owner: owner, items: map[owner], summary: summarize(map[owner]) };
   });
 }
-function ownerCount(items) {
+function ownerCount() {
   return ownerNames.length;
 }
 
@@ -193,7 +231,7 @@ function prescriptionButton(item) {
   var button = document.createElement("button");
   button.type = "button";
   button.className = "btn " + (item.prescriptionDone ? "done" : "pending");
-  button.textContent = item.prescriptionDone ? "처방입력 완료" : "처방입력 미완료";
+  button.textContent = item.prescriptionDone ? "처방완료" : "미완료";
   button.addEventListener("click", function(e) {
     e.stopPropagation();
     togglePrescription(item).catch(function(error) {
@@ -219,12 +257,12 @@ function reportCard(item, index) {
   var amount = document.createElement("div");
   amount.className = "report-amount";
   amount.textContent = won(item.amount);
-  var info = document.createElement("div");
-  info.className = "report-info";
-  info.textContent = item.date + " · " + item.product;
   top.appendChild(client);
   top.appendChild(amount);
-  top.appendChild(info);
+
+  var info = document.createElement("div");
+  info.className = "report-info";
+  info.textContent = item.date + " · 수거 " + collectionMonthOf(item) + "월 · " + item.product;
 
   var bottom = document.createElement("div");
   bottom.className = "report-bottom";
@@ -264,6 +302,7 @@ function reportCard(item, index) {
 
   card.appendChild(number);
   card.appendChild(top);
+  card.appendChild(info);
   card.appendChild(bottom);
   return card;
 }
@@ -282,7 +321,7 @@ function addDetailMetric(parent, owner, filterType, value, sub) {
   var strong = document.createElement("strong");
   strong.textContent = value;
   var small = document.createElement("span");
-  small.textContent = sub + " · 누르면 해당 거래처만 보기";
+  small.textContent = sub;
 
   button.appendChild(span);
   button.appendChild(strong);
@@ -358,7 +397,7 @@ function renderOwnerCards(items) {
 function render() {
   var items = monthlyItems();
   var summary = summarize(items);
-  var targetAmount = ownerCount(items) * 2000000;
+  var targetAmount = ownerCount() * 2000000;
   var achievementRate = targetAmount ? Math.round(summary.total.amount / targetAmount * 100) : 0;
 
   syncMonthPicker();
@@ -379,6 +418,7 @@ function resetAfterSave() {
   productInput.value = "클로르";
   amountInput.value = "";
   selectedType = "신규";
+  setDefaultCollectionMonth();
   updateTypeButtons();
   updateAmountPreview();
   document.getElementById("submitBtn").textContent = "저장";
@@ -391,6 +431,7 @@ function resetFormAll() {
   amountInput.value = "";
   dateInput.value = todayText;
   selectedType = "신규";
+  setDefaultCollectionMonth();
   updateTypeButtons();
   updateAmountPreview();
   document.getElementById("submitBtn").textContent = "저장";
@@ -403,11 +444,28 @@ function startEdit(item) {
   productInput.value = item.product;
   amountInput.value = String(Math.round(Number(item.amount || 0) / 10000));
   selectedType = item.type;
+  collectionYear = collectionYearOf(item);
+  collectionMonth = collectionMonthOf(item);
+  syncCollectionButtons();
   updateTypeButtons();
   updateAmountPreview();
   document.getElementById("submitBtn").textContent = "수정 저장";
+  document.body.classList.add("view-form");
+  document.body.classList.remove("view-dashboard");
+  document.querySelectorAll("[data-view]").forEach(function(tab) {
+    tab.classList.toggle("active", tab.dataset.view === "form");
+  });
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
+
+for (var i = 1; i <= 12; i += 1) {
+  var monthButton = document.createElement("button");
+  monthButton.type = "button";
+  monthButton.dataset.collectionMonth = String(i);
+  monthButton.textContent = i + "월";
+  collectionButtons.appendChild(monthButton);
+}
+syncCollectionButtons();
 
 amountInput.addEventListener("input", function() {
   amountInput.value = digits(amountInput.value);
@@ -423,6 +481,11 @@ document.querySelectorAll("[data-type]").forEach(function(button) {
   button.addEventListener("click", function() {
     selectedType = button.dataset.type;
     updateTypeButtons();
+  });
+});
+document.querySelectorAll("[data-collection-month]").forEach(function(button) {
+  button.addEventListener("click", function() {
+    setCollectionMonth(button.dataset.collectionMonth);
   });
 });
 document.getElementById("prevMonthBtn").addEventListener("click", function() { moveMonth(-1); });
@@ -454,7 +517,7 @@ form.addEventListener("submit", async function(e) {
 
   var owner = ownerInput.value.trim();
   if (!owner) {
-    toast("담당자 이름을 입력해주세요.");
+    toast("담당자 이름을 선택해주세요.");
     return;
   }
   if (!clientInput.value.trim()) {
@@ -486,6 +549,8 @@ form.addEventListener("submit", async function(e) {
     type: selectedType,
     product: productInput.value,
     amount: amountWon(amountInput.value),
+    collectionYear: collectionYear,
+    collectionMonth: collectionMonth,
     prescriptionDone: Boolean(old.prescriptionDone)
   };
 

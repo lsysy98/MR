@@ -46,6 +46,9 @@
     .seg { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 4px; border: 1px solid #cbd8d1; border-radius: 8px; }
     .seg button { border: 0; border-radius: 6px; background: #fff; color: var(--muted); min-height: 38px; cursor: pointer; }
     .seg button.active { background: var(--green); color: #fff; font-weight: 800; }
+    .collection-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; }
+    .collection-grid button { min-height: 36px; border: 1px solid #bfd0c8; border-radius: 8px; background: #fff; color: #0f5b47; cursor: pointer; }
+    .collection-grid button.active { background: var(--green); border-color: var(--green); color: #fff; font-weight: 900; }
     .quick-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
     .amount-wrap { position: relative; }
     .amount-wrap input { padding-right: 54px; }
@@ -84,21 +87,21 @@
     .owner-button.active { background: var(--green-soft); }
     .owner-name { font-size: 15px; font-weight: 900; color: var(--text); }
     .owner-line { font-size: 15px; color: var(--text); white-space: nowrap; }
-    .owner-detail-summary { display: none; grid-template-columns: 1fr 1fr auto; gap: 8px; padding: 10px; border-top: 1px solid var(--line); background: #fbfdfc; }
+    .owner-detail-summary { display: none; grid-template-columns: 1fr 1fr auto; gap: 8px; padding: 8px; border-top: 1px solid var(--line); background: #fbfdfc; }
     .owner-card.open .owner-detail-summary { display: grid; }
-    .detail-metric { border: 1px solid var(--line); border-radius: 8px; background: #fff; padding: 10px; display: grid; gap: 4px; text-align: left; cursor: pointer; }
+    .detail-metric { border: 1px solid var(--line); border-radius: 8px; background: #fff; padding: 8px; display: grid; gap: 3px; text-align: left; cursor: pointer; }
     .detail-metric.active { border-color: var(--green); background: var(--green-soft); }
     .detail-metric span { color: var(--muted); font-size: 12px; }
-    .detail-metric strong { font-size: 16px; }
+    .detail-metric strong { font-size: 15px; }
     .detail-reset { align-self: stretch; min-width: 72px; }
-    .detail-list { display: none; border-top: 1px solid var(--line); padding: 12px; gap: 11px; background: #eef5f1; }
+    .detail-list { display: none; border-top: 1px solid var(--line); padding: 9px; gap: 8px; background: #eef5f1; }
     .owner-card.open .detail-list { display: grid; }
     .report-card {
       position: relative;
-      box-shadow: 0 5px 14px rgba(27,45,37,.07);
-      padding: 12px 12px 12px 48px;
+      box-shadow: 0 4px 10px rgba(27,45,37,.06);
+      padding: 9px 9px 9px 42px;
       display: grid;
-      gap: 9px;
+      gap: 6px;
       border-color: #c8d7d0;
       overflow: hidden;
     }
@@ -114,28 +117,29 @@
     .report-card.growth::before { background: var(--amber); }
     .report-number {
       position: absolute;
-      left: 14px;
-      top: 13px;
-      width: 22px;
-      height: 22px;
+      left: 12px;
+      top: 11px;
+      width: 20px;
+      height: 20px;
       display: grid;
       place-items: center;
       border-radius: 50%;
       background: #edf3f0;
       color: #355247;
-      font-size: 12px;
+      font-size: 11px;
       font-weight: 900;
     }
-    .report-top { display: grid; gap: 4px; }
-    .client { font-weight: 900; font-size: 16px; }
-    .report-amount { font-weight: 900; font-size: 24px; color: #10251d; line-height: 1.1; }
-    .report-info { color: var(--muted); font-size: 13px; display: flex; gap: 8px; flex-wrap: wrap; }
-    .report-bottom { display: flex; justify-content: space-between; gap: 8px; align-items: end; }
-    .report-actions { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
-    .badge { display: inline-flex; align-items: center; min-height: 25px; border-radius: 999px; padding: 0 9px; font-size: 12px; font-weight: 800; white-space: nowrap; }
+    .report-top { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px; align-items: start; }
+    .client { font-weight: 900; font-size: 15px; line-height: 1.25; overflow-wrap: anywhere; }
+    .report-amount { font-weight: 900; font-size: 20px; color: #10251d; line-height: 1.1; white-space: nowrap; }
+    .report-info { color: var(--muted); font-size: 12px; display: flex; gap: 6px; flex-wrap: wrap; }
+    .report-bottom { display: flex; justify-content: space-between; gap: 6px; align-items: center; }
+    .report-actions { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; }
+    .report-actions .btn { min-height: 34px; padding: 0 9px; font-size: 13px; }
+    .badge { display: inline-flex; align-items: center; min-height: 23px; border-radius: 999px; padding: 0 8px; font-size: 12px; font-weight: 800; white-space: nowrap; }
     .badge.new { background: var(--blue-soft); color: var(--blue); }
     .badge.growth { background: var(--amber-soft); color: var(--amber); }
-    .empty { color: var(--muted); text-align: center; padding: 24px 10px; border: 1px dashed #cbd8d1; border-radius: 8px; background: #fff; }
+    .empty { color: var(--muted); text-align: center; padding: 18px 10px; border: 1px dashed #cbd8d1; border-radius: 8px; background: #fff; }
     @media (max-width: 900px) {
       header { padding: 12px 12px 10px; }
       .mobile-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 10px; padding: 4px; border: 1px solid #cbd8d1; border-radius: 8px; background: #f5f8f6; }
@@ -150,17 +154,16 @@
       .row, .month-nav, .month-main { grid-template-columns: 1fr; }
       .month-actions { display: grid; grid-template-columns: repeat(3, 1fr); }
       .quick-row { grid-template-columns: repeat(3, 1fr); }
+      .collection-grid { grid-template-columns: repeat(4, 1fr); }
       .owner-grid { border-radius: 7px; }
       .owner-button { min-height: 41px; grid-template-columns: 64px 1fr; padding: 7px 10px; }
       .owner-name { font-size: 15px; }
       .owner-line { text-align: right; font-size: 14px; letter-spacing: 0; }
       .owner-detail-summary { grid-template-columns: 1fr 1fr; }
       .detail-reset { grid-column: 1 / -1; }
-      .detail-list { padding: 10px; gap: 10px; }
-      .report-card { padding: 11px 10px 11px 46px; }
-      .report-amount { font-size: 25px; }
-      .report-bottom { align-items: start; }
-      .report-actions .btn { min-height: 38px; padding: 0 10px; }
+      .report-card { padding: 8px 8px 8px 40px; }
+      .report-amount { font-size: 19px; }
+      .report-bottom { align-items: center; }
     }
   </style>
 </head>
@@ -195,6 +198,9 @@
             <button type="button" class="active" data-type="신규">신규</button>
             <button type="button" data-type="매출증대">매출증대</button>
           </div>
+        </label>
+        <label>통계 수거 월
+          <div class="collection-grid" id="collectionMonthButtons"></div>
         </label>
         <div class="row">
           <label>품목/제품군
