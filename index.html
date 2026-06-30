@@ -46,9 +46,6 @@
     .seg { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 4px; border: 1px solid #cbd8d1; border-radius: 8px; }
     .seg button { border: 0; border-radius: 6px; background: #fff; color: var(--muted); min-height: 38px; cursor: pointer; }
     .seg button.active { background: var(--green); color: #fff; font-weight: 800; }
-    .collection-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; }
-    .collection-grid button { min-height: 36px; border: 1px solid #bfd0c8; border-radius: 8px; background: #fff; color: #0f5b47; cursor: pointer; }
-    .collection-grid button.active { background: var(--green); border-color: var(--green); color: #fff; font-weight: 900; }
     .quick-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
     .amount-wrap { position: relative; }
     .amount-wrap input { padding-right: 54px; }
@@ -154,7 +151,6 @@
       .row, .month-nav, .month-main { grid-template-columns: 1fr; }
       .month-actions { display: grid; grid-template-columns: repeat(3, 1fr); }
       .quick-row { grid-template-columns: repeat(3, 1fr); }
-      .collection-grid { grid-template-columns: repeat(4, 1fr); }
       .owner-grid { border-radius: 7px; }
       .owner-button { min-height: 41px; grid-template-columns: 64px 1fr; padding: 7px 10px; }
       .owner-name { font-size: 15px; }
@@ -200,7 +196,20 @@
           </div>
         </label>
         <label>통계 수거 월
-          <div class="collection-grid" id="collectionMonthButtons"></div>
+          <select id="collectionMonth">
+            <option value="1">1월</option>
+            <option value="2">2월</option>
+            <option value="3">3월</option>
+            <option value="4">4월</option>
+            <option value="5">5월</option>
+            <option value="6">6월</option>
+            <option value="7">7월</option>
+            <option value="8">8월</option>
+            <option value="9">9월</option>
+            <option value="10">10월</option>
+            <option value="11">11월</option>
+            <option value="12">12월</option>
+          </select>
         </label>
         <div class="row">
           <label>품목/제품군

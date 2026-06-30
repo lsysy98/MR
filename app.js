@@ -25,7 +25,7 @@ var amountPreview = document.getElementById("amountPreview");
 var ownerCards = document.getElementById("ownerCards");
 var statusBox = document.getElementById("statusBox");
 var monthPicker = document.getElementById("monthPicker");
-var collectionButtons = document.getElementById("collectionMonthButtons");
+var collectionInput = document.getElementById("collectionMonth");
 
 dateInput.value = todayText;
 var savedOwnerName = localStorage.getItem("ownerName") || "";
@@ -105,9 +105,7 @@ function syncMonthPicker() {
   if (monthPicker) monthPicker.value = monthValue();
 }
 function syncCollectionButtons() {
-  document.querySelectorAll("[data-collection-month]").forEach(function(button) {
-    button.classList.toggle("active", Number(button.dataset.collectionMonth) === collectionMonth);
-  });
+  if (collectionInput) collectionInput.value = String(collectionMonth);
 }
 function setCollectionMonth(month) {
   collectionMonth = Number(month);
@@ -125,14 +123,12 @@ function moveMonth(delta) {
   var d = new Date(selectedYear, selectedMonth - 1 + delta, 1);
   selectedYear = d.getFullYear();
   selectedMonth = d.getMonth() + 1;
-  openedOwner = "";
   syncMonthPicker();
   render();
 }
 function resetToCurrentMonth() {
   selectedYear = currentYear;
   selectedMonth = currentMonth;
-  openedOwner = "";
   syncMonthPicker();
   render();
 }
@@ -458,13 +454,6 @@ function startEdit(item) {
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
-for (var i = 1; i <= 12; i += 1) {
-  var monthButton = document.createElement("button");
-  monthButton.type = "button";
-  monthButton.dataset.collectionMonth = String(i);
-  monthButton.textContent = i + "월";
-  collectionButtons.appendChild(monthButton);
-}
 syncCollectionButtons();
 
 amountInput.addEventListener("input", function() {
@@ -483,10 +472,8 @@ document.querySelectorAll("[data-type]").forEach(function(button) {
     updateTypeButtons();
   });
 });
-document.querySelectorAll("[data-collection-month]").forEach(function(button) {
-  button.addEventListener("click", function() {
-    setCollectionMonth(button.dataset.collectionMonth);
-  });
+collectionInput.addEventListener("change", function() {
+  setCollectionMonth(collectionInput.value);
 });
 document.getElementById("prevMonthBtn").addEventListener("click", function() { moveMonth(-1); });
 document.getElementById("nextMonthBtn").addEventListener("click", function() { moveMonth(1); });
@@ -508,7 +495,6 @@ monthPicker.addEventListener("change", function() {
   var parts = monthPicker.value.split("-");
   selectedYear = Number(parts[0]);
   selectedMonth = Number(parts[1]);
-  openedOwner = "";
   render();
 });
 
