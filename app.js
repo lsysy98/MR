@@ -224,6 +224,9 @@ function groupByOwner(items) {
 function ownerCount() {
   return ownerNames.length;
 }
+function ownerAchievementRate(amount) {
+  return Math.round((Number(amount) || 0) / 2000000 * 100);
+}
 
 function prescriptionButton(item) {
   var button = document.createElement("button");
@@ -329,8 +332,15 @@ function addDetailMetric(parent, owner, filterType, value, sub) {
 function renderOwnerCards(items) {
   ownerCards.textContent = "";
 
-  groupByOwner(items).forEach(function(group) {
+  groupByOwner(items).sort(function(a, b) {
+    var rateDiff = ownerAchievementRate(b.summary.total.amount) - ownerAchievementRate(a.summary.total.amount);
+    if (rateDiff !== 0) return rateDiff;
+    var amountDiff = b.summary.total.amount - a.summary.total.amount;
+    if (amountDiff !== 0) return amountDiff;
+    return ownerNames.indexOf(a.owner) - ownerNames.indexOf(b.owner);
+  }).forEach(function(group) {
     var summary = group.summary;
+    var achievementRate = ownerAchievementRate(summary.total.amount);
     var card = document.createElement("div");
     card.className = "owner-card" + (openedOwner === group.owner ? " open" : "");
 
@@ -347,7 +357,7 @@ function renderOwnerCards(items) {
     name.textContent = group.owner;
     var line = document.createElement("div");
     line.className = "owner-line";
-    line.textContent = "신규 " + summary.new.count + "건  증대 " + summary.growth.count + "건  " + won(summary.total.amount);
+    line.textContent = achievementRate + "%";
     button.appendChild(name);
     button.appendChild(line);
 
