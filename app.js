@@ -10,7 +10,9 @@ var collectionYear = defaultCollection.year;
 var collectionMonth = defaultCollection.month;
 var reports = [];
 var selectedType = "신규";
+var selectedTeamPeriod = "today";
 var openedOwner = "";
+var openedTeamOwner = "";
 var ownerFilters = {};
 var editingId = "";
 var ownerNames = ["성진욱", "김무영", "이승엽", "김태홍", "제성규", "송진영", "이현욱"];
@@ -23,6 +25,8 @@ var productInput = document.getElementById("product");
 var amountInput = document.getElementById("amount");
 var amountPreview = document.getElementById("amountPreview");
 var ownerCards = document.getElementById("ownerCards");
+var todayOwnerCards = document.getElementById("todayOwnerCards");
+var todayEmpty = document.getElementById("todayEmpty");
 var statusBox = document.getElementById("statusBox");
 var monthPicker = document.getElementById("monthPicker");
 var collectionLabel = document.getElementById("collectionLabel");
@@ -207,6 +211,22 @@ function monthlyItems() {
     return collectionYearOf(item) === selectedYear &&
       collectionMonthOf(item) === selectedMonth &&
       ownerNames.indexOf(item.owner) >= 0;
+  });
+}
+function weekRange() {
+  var dayOffset = (today.getDay() + 6) % 7;
+  var start = new Date(today.getFullYear(), today.getMonth(), today.getDate() - dayOffset);
+  var end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 6);
+  return { start: dateText(start), end: dateText(end) };
+}
+function teamPeriodItems() {
+  var range = weekRange();
+  return reports.filter(function(item) {
+    if (ownerNames.indexOf(item.owner) < 0) return false;
+    if (selectedTeamPeriod === "week") {
+      return item.date >= range.start && item.date <= range.end;
+    }
+    return item.date === todayText;
   });
 }
 function groupByOwner(items) {
@@ -402,9 +422,64 @@ function renderOwnerCards(items) {
     ownerCards.appendChild(card);
   });
 }
+function renderTeamCards(items) {
+  if (!todayOwnerCards) return;
+  todayOwnerCards.textContent = "";
+
+  groupByOwner(items).sort(function(a, b) {
+    var amountDiff = b.summary.total.amount - a.summary.total.amount;
+    if (amountDiff !== 0) return amountDiff;
+    return ownerNames.indexOf(a.owner) - ownerNames.indexOf(b.owner);
+  }).forEach(function(group) {
+    var summary = group.summary;
+    var card = document.createElement("div");
+    card.className = "owner-card" + (openedTeamOwner === group.owner ? " open" : "");
+
+    var button = document.createElement("button");
+    button.type = "button";
+    button.className = "owner-button" + (openedTeamOwner === group.owner ? " active" : "");
+    button.addEventListener("click", function() {
+      openedTeamOwner = openedTeamOwner === group.owner ? "" : group.owner;
+      render();
+    });
+
+    var name = document.createElement("div");
+    name.className = "owner-name";
+    name.textContent = group.owner;
+
+    var line = document.createElement("div");
+    line.className = "team-line";
+    line.textContent = "신규" + summary.new.count + " / 증대" + summary.growth.count + " / " + won(summary.total.amount);
+
+    button.appendChild(name);
+    button.appendChild(line);
+
+    var detail = document.createElement("div");
+    detail.className = "detail-list";
+    group.items
+      .slice()
+      .sort(function(a, b) { return Number(b.createdAt || 0) - Number(a.createdAt || 0); })
+      .forEach(function(item, index) {
+        detail.appendChild(reportCard(item, index));
+      });
+
+    if (!detail.children.length) {
+      var empty = document.createElement("div");
+      empty.className = "empty";
+      empty.textContent = selectedTeamPeriod === "week" ? "이번주 보고가 없습니다." : "오늘 보고가 없습니다.";
+      detail.appendChild(empty);
+    }
+
+    card.appendChild(button);
+    card.appendChild(detail);
+    todayOwnerCards.appendChild(card);
+  });
+}
 function render() {
   var items = monthlyItems();
+  var teamItems = teamPeriodItems();
   var summary = summarize(items);
+  var teamSummary = summarize(teamItems);
   var targetAmount = ownerCount() * 2000000;
   var achievementRate = targetAmount ? Math.round(summary.total.amount / targetAmount * 100) : 0;
 
@@ -419,6 +494,15 @@ function render() {
   document.getElementById("doneCount").textContent = "총매출 " + won(summary.total.amount) + " / 목표 " + won(targetAmount);
   document.getElementById("empty").style.display = items.length ? "none" : "block";
   renderOwnerCards(items);
+
+  document.getElementById("todayTotalAmount").textContent = won(teamSummary.total.amount);
+  document.getElementById("todayTotalCount").textContent = teamSummary.total.count + "건";
+  document.getElementById("todayNewAmount").textContent = won(teamSummary.new.amount);
+  document.getElementById("todayNewCount").textContent = teamSummary.new.count + "건";
+  document.getElementById("todayGrowthAmount").textContent = won(teamSummary.growth.amount);
+  document.getElementById("todayGrowthCount").textContent = teamSummary.growth.count + "건";
+  if (todayEmpty) todayEmpty.style.display = teamItems.length ? "none" : "block";
+  renderTeamCards(teamItems);
 }
 function resetAfterSave() {
   editingId = "";
@@ -460,6 +544,7 @@ function startEdit(item) {
   document.getElementById("submitBtn").textContent = "수정 저장";
   document.body.classList.add("view-form");
   document.body.classList.remove("view-dashboard");
+  document.body.classList.remove("view-today");
   document.querySelectorAll("[data-view]").forEach(function(tab) {
     tab.classList.toggle("active", tab.dataset.view === "form");
   });
@@ -495,10 +580,21 @@ document.querySelectorAll("[data-view]").forEach(function(button) {
     var view = button.dataset.view;
     document.body.classList.toggle("view-form", view === "form");
     document.body.classList.toggle("view-dashboard", view === "dashboard");
+    document.body.classList.toggle("view-today", view === "today");
     document.querySelectorAll("[data-view]").forEach(function(tab) {
       tab.classList.toggle("active", tab.dataset.view === view);
     });
     window.scrollTo({ top: 0, behavior: "smooth" });
+  });
+});
+document.querySelectorAll("[data-period]").forEach(function(button) {
+  button.addEventListener("click", function() {
+    selectedTeamPeriod = button.dataset.period;
+    openedTeamOwner = "";
+    document.querySelectorAll("[data-period]").forEach(function(periodButton) {
+      periodButton.classList.toggle("active", periodButton.dataset.period === selectedTeamPeriod);
+    });
+    render();
   });
 });
 monthPicker.addEventListener("change", function() {

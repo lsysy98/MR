@@ -58,6 +58,7 @@
     .status.ok { border-color: #98d8bf; background: #ecf9f3; color: #0f5b47; }
     .status.error { border-color: #efb8b8; background: #fff1f1; color: #b42323; }
     .mobile-tabs { display: none; }
+    .today-panel { grid-column: 2; }
     .summary-title { margin: 2px 0 -2px; color: var(--muted); font-size: 14px; font-weight: 800; }
     .summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
     .metric { padding: 14px; min-height: 92px; display: grid; gap: 6px; align-content: space-between; }
@@ -97,6 +98,14 @@
       text-align: center;
       white-space: nowrap;
     }
+    .team-line {
+      color: var(--text);
+      font-size: 14px;
+      font-weight: 800;
+      text-align: right;
+      white-space: nowrap;
+    }
+    .period-switch { grid-template-columns: 1fr 1fr; }
     .owner-detail-summary { display: none; grid-template-columns: 1fr 1fr auto; gap: 8px; padding: 8px; border-top: 1px solid var(--line); background: #fbfdfc; }
     .owner-card.open .owner-detail-summary { display: grid; }
     .detail-metric { border: 1px solid var(--line); border-radius: 8px; background: #fff; padding: 8px; display: grid; gap: 3px; text-align: left; cursor: pointer; }
@@ -152,14 +161,15 @@
     .empty { color: var(--muted); text-align: center; padding: 18px 10px; border: 1px dashed #cbd8d1; border-radius: 8px; background: #fff; }
     @media (max-width: 900px) {
       header { padding: 12px 12px 10px; }
-      .mobile-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 10px; padding: 4px; border: 1px solid #cbd8d1; border-radius: 8px; background: #f5f8f6; }
+      .mobile-tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 10px; padding: 4px; border: 1px solid #cbd8d1; border-radius: 8px; background: #f5f8f6; }
       .mobile-tab { min-height: 38px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); font-weight: 800; cursor: pointer; }
       .mobile-tab.active { background: var(--green); color: #fff; }
       main { display: block; padding: 14px 12px 24px; }
-      body.view-dashboard .input-panel { display: none; }
-      body.view-form .dashboard { display: none; }
-      .input-panel, .dashboard { scroll-margin-top: 108px; }
-      .dashboard { margin-top: 0; }
+      body.view-dashboard .input-panel, body.view-dashboard .today-panel { display: none; }
+      body.view-form .dashboard, body.view-form .today-panel { display: none; }
+      body.view-today .input-panel, body.view-today .dashboard { display: none; }
+      .input-panel, .dashboard, .today-panel { scroll-margin-top: 108px; }
+      .dashboard, .today-panel { margin-top: 0; }
       .summary { grid-template-columns: 1fr 1fr; }
       .row, .month-nav, .month-main { grid-template-columns: 1fr; }
       .collection-nav { grid-template-columns: 1fr 1.15fr 1fr; }
@@ -169,6 +179,7 @@
       .owner-button { min-height: 41px; grid-template-columns: 64px 1fr; padding: 7px 10px; }
       .owner-name { font-size: 15px; }
       .owner-line { min-width: 50px; font-size: 14px; padding: 7px 9px; letter-spacing: 0; }
+      .team-line { font-size: 13px; letter-spacing: 0; }
       .owner-detail-summary { grid-template-columns: 1fr 1fr; }
       .detail-reset { grid-column: 1 / -1; }
       .report-card { padding: 8px 8px 8px 40px; }
@@ -183,6 +194,7 @@
     <div class="mobile-tabs" aria-label="화면 선택">
       <button class="mobile-tab" type="button" data-view="form">작성하기</button>
       <button class="mobile-tab active" type="button" data-view="dashboard">보고현황</button>
+      <button class="mobile-tab" type="button" data-view="today">금일종합</button>
     </div>
   </header>
   <main>
@@ -274,6 +286,25 @@
           <div class="metric"><span>목표 달성율</span><strong id="doneRate">0%</strong><small id="doneCount">총매출 0원 / 목표 0원</small></div>
         </div>
       </div>
+    </section>
+
+    <section class="today-panel" id="todayPanel">
+      <section>
+        <div class="head"><h2>금일 종합</h2></div>
+        <div class="body">
+          <div class="seg period-switch">
+            <button type="button" class="active" data-period="today">오늘</button>
+            <button type="button" data-period="week">이번주</button>
+          </div>
+          <div class="summary">
+            <div class="metric"><span>전체</span><strong id="todayTotalAmount">0원</strong><small id="todayTotalCount">0건</small></div>
+            <div class="metric"><span>신규</span><strong id="todayNewAmount">0원</strong><small id="todayNewCount">0건</small></div>
+            <div class="metric"><span>매출증대</span><strong id="todayGrowthAmount">0원</strong><small id="todayGrowthCount">0건</small></div>
+          </div>
+          <div class="owner-grid" id="todayOwnerCards"></div>
+          <div class="empty" id="todayEmpty">오늘 입력된 보고가 없습니다.</div>
+        </div>
+      </section>
     </section>
   </main>
   <script src="app.js"></script>
