@@ -46,6 +46,8 @@
     .seg { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 4px; border: 1px solid #cbd8d1; border-radius: 8px; }
     .seg button { border: 0; border-radius: 6px; background: #fff; color: var(--muted); min-height: 38px; cursor: pointer; }
     .seg button.active { background: var(--green); color: #fff; font-weight: 800; }
+    .collection-nav { display: grid; grid-template-columns: 1fr 1.15fr 1fr; gap: 8px; align-items: center; }
+    .collection-label { min-height: 42px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 8px; background: #fff; font-weight: 900; }
     .quick-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
     .amount-wrap { position: relative; }
     .amount-wrap input { padding-right: 54px; }
@@ -149,6 +151,7 @@
       .dashboard { margin-top: 0; }
       .summary { grid-template-columns: 1fr 1fr; }
       .row, .month-nav, .month-main { grid-template-columns: 1fr; }
+      .collection-nav { grid-template-columns: 1fr 1.15fr 1fr; }
       .month-actions { display: grid; grid-template-columns: repeat(3, 1fr); }
       .quick-row { grid-template-columns: repeat(3, 1fr); }
       .owner-grid { border-radius: 7px; }
@@ -196,20 +199,11 @@
           </div>
         </label>
         <label>통계 수거 월
-          <select id="collectionMonth">
-            <option value="1">1월</option>
-            <option value="2">2월</option>
-            <option value="3">3월</option>
-            <option value="4">4월</option>
-            <option value="5">5월</option>
-            <option value="6">6월</option>
-            <option value="7">7월</option>
-            <option value="8">8월</option>
-            <option value="9">9월</option>
-            <option value="10">10월</option>
-            <option value="11">11월</option>
-            <option value="12">12월</option>
-          </select>
+          <div class="collection-nav">
+            <button class="btn" type="button" id="prevCollectionBtn">이전 달</button>
+            <div class="collection-label" id="collectionLabel">2026.07</div>
+            <button class="btn" type="button" id="nextCollectionBtn">다음 달</button>
+          </div>
         </label>
         <div class="row">
           <label>품목/제품군

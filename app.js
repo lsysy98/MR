@@ -25,7 +25,7 @@ var amountPreview = document.getElementById("amountPreview");
 var ownerCards = document.getElementById("ownerCards");
 var statusBox = document.getElementById("statusBox");
 var monthPicker = document.getElementById("monthPicker");
-var collectionInput = document.getElementById("collectionMonth");
+var collectionLabel = document.getElementById("collectionLabel");
 
 dateInput.value = todayText;
 var savedOwnerName = localStorage.getItem("ownerName") || "";
@@ -105,12 +105,14 @@ function syncMonthPicker() {
   if (monthPicker) monthPicker.value = monthValue();
 }
 function syncCollectionButtons() {
-  if (collectionInput) collectionInput.value = String(collectionMonth);
+  if (collectionLabel) {
+    collectionLabel.textContent = collectionYear + "." + String(collectionMonth).padStart(2, "0");
+  }
 }
-function setCollectionMonth(month) {
-  collectionMonth = Number(month);
-  collectionYear = currentYear;
-  if (collectionMonth <= currentMonth) collectionYear += 1;
+function moveCollectionMonth(delta) {
+  var d = new Date(collectionYear, collectionMonth - 1 + delta, 1);
+  collectionYear = d.getFullYear();
+  collectionMonth = d.getMonth() + 1;
   syncCollectionButtons();
 }
 function setDefaultCollectionMonth() {
@@ -472,9 +474,8 @@ document.querySelectorAll("[data-type]").forEach(function(button) {
     updateTypeButtons();
   });
 });
-collectionInput.addEventListener("change", function() {
-  setCollectionMonth(collectionInput.value);
-});
+document.getElementById("prevCollectionBtn").addEventListener("click", function() { moveCollectionMonth(-1); });
+document.getElementById("nextCollectionBtn").addEventListener("click", function() { moveCollectionMonth(1); });
 document.getElementById("prevMonthBtn").addEventListener("click", function() { moveMonth(-1); });
 document.getElementById("nextMonthBtn").addEventListener("click", function() { moveMonth(1); });
 document.getElementById("currentMonthBtn").addEventListener("click", resetToCurrentMonth);
