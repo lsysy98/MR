@@ -107,9 +107,10 @@
     }
     .team-line {
       display: grid;
-      grid-template-columns: 42px 42px minmax(104px, 1fr);
+      grid-template-columns: 42px 42px minmax(96px, auto);
       gap: 5px;
       align-items: center;
+      justify-content: end;
       white-space: nowrap;
     }
     .team-line span { text-align: right; }
@@ -215,7 +216,7 @@
       .owner-line { grid-template-columns: 38px 38px 38px; gap: 4px; justify-self: end; letter-spacing: 0; }
       .owner-count { font-size: 11px; }
       .owner-rate { font-size: 11px; padding: 5px 6px; }
-      .team-line { grid-template-columns: 38px 38px minmax(96px, 1fr); gap: 4px; letter-spacing: 0; }
+      .team-line { grid-template-columns: 36px 36px minmax(92px, auto); gap: 4px; justify-self: end; letter-spacing: 0; }
       .team-line .team-count { font-size: 11px; }
       .team-line .team-amount { font-size: 13px; }
       .day-control, .week-control { grid-template-columns: .68fr minmax(154px, 1.64fr) .68fr; gap: 6px; }
