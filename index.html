@@ -87,15 +87,15 @@
     .owner-button.active { background: var(--green-soft); }
     .owner-name { font-size: 15px; font-weight: 900; color: var(--text); }
     .owner-line {
-      display: flex;
+      display: grid;
+      grid-template-columns: 54px 54px 42px;
       align-items: center;
       justify-content: flex-end;
-      gap: 7px;
+      gap: 6px;
       white-space: nowrap;
     }
-    .owner-counts { color: var(--muted); font-size: 12px; font-weight: 800; }
+    .owner-count { color: var(--muted); font-size: 12px; font-weight: 800; text-align: right; }
     .owner-rate {
-      min-width: 42px;
       border-radius: 999px;
       background: var(--green-soft);
       color: var(--green);
@@ -106,16 +106,41 @@
       text-align: center;
     }
     .team-line {
+      display: grid;
+      grid-template-columns: 54px 54px minmax(86px, 1fr);
+      gap: 6px;
+      align-items: center;
       color: var(--text);
       font-size: 14px;
       font-weight: 800;
-      text-align: right;
       white-space: nowrap;
     }
+    .team-line span { text-align: right; }
+    .team-line .team-amount { font-variant-numeric: tabular-nums; }
     .period-switch { grid-template-columns: 1fr 1fr; }
     .period-controls { display: grid; gap: 8px; }
-    .week-control { display: grid; grid-template-columns: 1fr 1.15fr 1fr; gap: 8px; align-items: center; }
-    .week-label { min-height: 42px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 8px; background: #fff; font-weight: 900; }
+    .day-control, .week-control { display: grid; grid-template-columns: 1fr 1.2fr 1fr; gap: 8px; align-items: center; }
+    .date-pick-wrap { position: relative; }
+    .date-label, .week-label {
+      width: 100%;
+      min-height: 42px;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      color: var(--text);
+      font-weight: 900;
+      cursor: pointer;
+    }
+    .hidden-date {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      opacity: 0;
+      cursor: pointer;
+    }
     .owner-detail-summary { display: none; grid-template-columns: 1fr 1fr auto; gap: 8px; padding: 8px; border-top: 1px solid var(--line); background: #fbfdfc; }
     .owner-card.open .owner-detail-summary { display: grid; }
     .detail-metric { border: 1px solid var(--line); border-radius: 8px; background: #fff; padding: 8px; display: grid; gap: 3px; text-align: left; cursor: pointer; }
@@ -188,9 +213,9 @@
       .owner-grid { border-radius: 7px; }
       .owner-button { min-height: 41px; grid-template-columns: 64px 1fr; padding: 7px 10px; }
       .owner-name { font-size: 15px; }
-      .owner-line { gap: 6px; justify-self: end; letter-spacing: 0; }
-      .owner-counts { font-size: 11px; }
-      .owner-rate { min-width: 38px; font-size: 11px; padding: 5px 6px; }
+      .owner-line { grid-template-columns: 48px 48px 38px; gap: 5px; justify-self: end; letter-spacing: 0; }
+      .owner-count { font-size: 11px; }
+      .owner-rate { font-size: 11px; padding: 5px 6px; }
       .team-line { font-size: 13px; letter-spacing: 0; }
       .owner-detail-summary { grid-template-columns: 1fr 1fr; }
       .detail-reset { grid-column: 1 / -1; }
@@ -205,8 +230,8 @@
     <h1>영업 일일보고</h1>
     <div class="mobile-tabs" aria-label="화면 선택">
       <button class="mobile-tab" type="button" data-view="form">작성하기</button>
-      <button class="mobile-tab active" type="button" data-view="dashboard">보고현황</button>
-      <button class="mobile-tab" type="button" data-view="today">금일종합</button>
+      <button class="mobile-tab active" type="button" data-view="dashboard">월간현황</button>
+      <button class="mobile-tab" type="button" data-view="today">일일현황</button>
     </div>
   </header>
   <main>
@@ -302,17 +327,27 @@
 
     <section class="today-panel" id="todayPanel">
       <section>
-        <div class="head"><h2>금일 종합</h2></div>
+        <div class="head"><h2>일일현황</h2></div>
         <div class="body">
           <div class="seg period-switch">
             <button type="button" class="active" data-period="day">일간</button>
             <button type="button" data-period="week">주간</button>
           </div>
           <div class="period-controls">
-            <input id="teamDatePicker" type="date" aria-label="금일 종합 날짜 선택">
+            <div class="day-control" id="teamDayControl">
+              <button class="btn" type="button" id="prevDayBtn">이전 일</button>
+              <div class="date-pick-wrap">
+                <button class="date-label" type="button" id="teamDateLabel">2026. 07. 01. 수</button>
+                <input class="hidden-date" id="teamDatePicker" type="date" aria-label="일일현황 날짜 선택">
+              </div>
+              <button class="btn" type="button" id="nextDayBtn">다음 일</button>
+            </div>
             <div class="week-control" id="teamWeekControl">
               <button class="btn" type="button" id="prevWeekBtn">이전 주</button>
-              <div class="week-label" id="teamWeekLabel">7월 1주차</div>
+              <div class="date-pick-wrap">
+                <button class="week-label" type="button" id="teamWeekLabel">7월 1주차</button>
+                <input class="hidden-date" id="teamWeekPicker" type="date" aria-label="일일현황 주차 선택">
+              </div>
               <button class="btn" type="button" id="nextWeekBtn">다음 주</button>
             </div>
           </div>
