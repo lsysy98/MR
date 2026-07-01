@@ -10,7 +10,9 @@ var collectionYear = defaultCollection.year;
 var collectionMonth = defaultCollection.month;
 var reports = [];
 var selectedType = "신규";
-var selectedTeamPeriod = "today";
+var selectedTeamPeriod = "day";
+var selectedTeamDate = todayText;
+var selectedWeekStart = dateText(startOfWeekDate(today));
 var openedOwner = "";
 var openedTeamOwner = "";
 var ownerFilters = {};
@@ -30,8 +32,12 @@ var todayEmpty = document.getElementById("todayEmpty");
 var statusBox = document.getElementById("statusBox");
 var monthPicker = document.getElementById("monthPicker");
 var collectionLabel = document.getElementById("collectionLabel");
+var teamDatePicker = document.getElementById("teamDatePicker");
+var teamWeekControl = document.getElementById("teamWeekControl");
+var teamWeekLabel = document.getElementById("teamWeekLabel");
 
 dateInput.value = todayText;
+if (teamDatePicker) teamDatePicker.value = selectedTeamDate;
 var savedOwnerName = localStorage.getItem("ownerName") || "";
 ownerInput.value = ownerNames.indexOf(savedOwnerName) >= 0 ? savedOwnerName : "";
 productInput.value = "클로르";
@@ -42,6 +48,24 @@ function dateText(d) {
     String(d.getMonth() + 1).padStart(2, "0"),
     String(d.getDate()).padStart(2, "0")
   ].join("-");
+}
+function parseDateText(value) {
+  var parts = String(value || todayText).split("-").map(Number);
+  return new Date(parts[0], parts[1] - 1, parts[2]);
+}
+function addDays(d, days) {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate() + days);
+}
+function startOfWeekDate(d) {
+  var dayOffset = (d.getDay() + 6) % 7;
+  return addDays(d, -dayOffset);
+}
+function weekLabelFromStart(startText) {
+  var base = addDays(parseDateText(startText), 3);
+  var first = new Date(base.getFullYear(), base.getMonth(), 1);
+  var firstOffset = (first.getDay() + 6) % 7;
+  var weekNo = Math.ceil((base.getDate() + firstOffset) / 7);
+  return (base.getMonth() + 1) + "월 " + weekNo + "주차";
 }
 function nextCollectionMonth(d) {
   var year = d.getFullYear();
@@ -111,6 +135,18 @@ function syncMonthPicker() {
 function syncCollectionButtons() {
   if (collectionLabel) {
     collectionLabel.textContent = collectionYear + "." + String(collectionMonth).padStart(2, "0");
+  }
+}
+function syncTeamPeriodControls() {
+  if (teamDatePicker) {
+    teamDatePicker.value = selectedTeamDate;
+    teamDatePicker.style.display = selectedTeamPeriod === "day" ? "block" : "none";
+  }
+  if (teamWeekControl) {
+    teamWeekControl.style.display = selectedTeamPeriod === "week" ? "grid" : "none";
+  }
+  if (teamWeekLabel) {
+    teamWeekLabel.textContent = weekLabelFromStart(selectedWeekStart);
   }
 }
 function moveCollectionMonth(delta) {
@@ -214,9 +250,8 @@ function monthlyItems() {
   });
 }
 function weekRange() {
-  var dayOffset = (today.getDay() + 6) % 7;
-  var start = new Date(today.getFullYear(), today.getMonth(), today.getDate() - dayOffset);
-  var end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 6);
+  var start = parseDateText(selectedWeekStart);
+  var end = addDays(start, 6);
   return { start: dateText(start), end: dateText(end) };
 }
 function teamPeriodItems() {
@@ -226,7 +261,7 @@ function teamPeriodItems() {
     if (selectedTeamPeriod === "week") {
       return item.date >= range.start && item.date <= range.end;
     }
-    return item.date === todayText;
+    return item.date === selectedTeamDate;
   });
 }
 function groupByOwner(items) {
@@ -377,7 +412,14 @@ function renderOwnerCards(items) {
     name.textContent = group.owner;
     var line = document.createElement("div");
     line.className = "owner-line";
-    line.textContent = achievementRate + "%";
+    var counts = document.createElement("span");
+    counts.className = "owner-counts";
+    counts.textContent = "신규" + summary.new.count + " / 증대" + summary.growth.count;
+    var rate = document.createElement("span");
+    rate.className = "owner-rate";
+    rate.textContent = achievementRate + "%";
+    line.appendChild(counts);
+    line.appendChild(rate);
     button.appendChild(name);
     button.appendChild(line);
 
@@ -466,7 +508,7 @@ function renderTeamCards(items) {
     if (!detail.children.length) {
       var empty = document.createElement("div");
       empty.className = "empty";
-      empty.textContent = selectedTeamPeriod === "week" ? "이번주 보고가 없습니다." : "오늘 보고가 없습니다.";
+      empty.textContent = selectedTeamPeriod === "week" ? "선택한 주의 보고가 없습니다." : "선택한 날짜의 보고가 없습니다.";
       detail.appendChild(empty);
     }
 
@@ -484,6 +526,7 @@ function render() {
   var achievementRate = targetAmount ? Math.round(summary.total.amount / targetAmount * 100) : 0;
 
   syncMonthPicker();
+  syncTeamPeriodControls();
   document.getElementById("totalAmount").textContent = won(summary.total.amount);
   document.getElementById("totalCount").textContent = summary.total.count + "건";
   document.getElementById("newAmount").textContent = won(summary.new.amount);
@@ -501,7 +544,10 @@ function render() {
   document.getElementById("todayNewCount").textContent = teamSummary.new.count + "건";
   document.getElementById("todayGrowthAmount").textContent = won(teamSummary.growth.amount);
   document.getElementById("todayGrowthCount").textContent = teamSummary.growth.count + "건";
-  if (todayEmpty) todayEmpty.style.display = teamItems.length ? "none" : "block";
+  if (todayEmpty) {
+    todayEmpty.textContent = selectedTeamPeriod === "week" ? "선택한 주의 보고가 없습니다." : "선택한 날짜의 보고가 없습니다.";
+    todayEmpty.style.display = teamItems.length ? "none" : "block";
+  }
   renderTeamCards(teamItems);
 }
 function resetAfterSave() {
@@ -552,6 +598,7 @@ function startEdit(item) {
 }
 
 syncCollectionButtons();
+syncTeamPeriodControls();
 
 amountInput.addEventListener("input", function() {
   amountInput.value = digits(amountInput.value);
@@ -596,6 +643,23 @@ document.querySelectorAll("[data-period]").forEach(function(button) {
     });
     render();
   });
+});
+if (teamDatePicker) {
+  teamDatePicker.addEventListener("change", function() {
+    selectedTeamDate = teamDatePicker.value || todayText;
+    openedTeamOwner = "";
+    render();
+  });
+}
+document.getElementById("prevWeekBtn").addEventListener("click", function() {
+  selectedWeekStart = dateText(addDays(parseDateText(selectedWeekStart), -7));
+  openedTeamOwner = "";
+  render();
+});
+document.getElementById("nextWeekBtn").addEventListener("click", function() {
+  selectedWeekStart = dateText(addDays(parseDateText(selectedWeekStart), 7));
+  openedTeamOwner = "";
+  render();
 });
 monthPicker.addEventListener("change", function() {
   if (!monthPicker.value) return;
