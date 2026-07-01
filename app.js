@@ -124,6 +124,7 @@ function typeClass(type) {
 }
 function status(message, type) {
   if (!statusBox) return;
+  statusBox.style.display = message ? "block" : "none";
   statusBox.textContent = message;
   statusBox.className = "status " + (type || "");
 }
@@ -206,7 +207,7 @@ async function api(method, body, query) {
 async function loadData() {
   status("Supabase 저장소와 연결 확인 중입니다.", "");
   reports = await api("GET");
-  status("연결 성공: 저장된 보고 " + reports.length + "건을 불러왔습니다.", "ok");
+  status("", "");
   render();
 }
 async function addData(item) {
