@@ -80,6 +80,25 @@ function fromDb(row) {
     prescriptionDone: Boolean(row.prescription_done)
   };
 }
+function logRow(action, actor, beforeRow, afterRow) {
+  const beforeData = beforeRow ? fromDb(beforeRow) : null;
+  const afterData = afterRow ? fromDb(afterRow) : null;
+  return {
+    action,
+    created_at: Date.now(),
+    actor: actor || afterData?.owner || beforeData?.owner || "",
+    report_id: afterData?.id || beforeData?.id || "",
+    client: afterData?.client || beforeData?.client || "",
+    before_data: beforeData,
+    after_data: afterData
+  };
+}
+async function writeLog(action, actor, beforeRow, afterRow) {
+  await supabase("report_logs", {
+    method: "POST",
+    body: JSON.stringify(logRow(action, actor, beforeRow, afterRow))
+  });
+}
 
 async function readBody(req) {
   if (req.body && typeof req.body === "object") return req.body;
@@ -135,20 +154,26 @@ module.exports = async function handler(req, res) {
 
     if (req.method === "PUT") {
       const item = await readBody(req);
+      const actor = item.actor || item.owner || "";
+      const oldRows = await supabase(`reports?id=eq.${encodeURIComponent(item.id)}&select=*`);
       item.updatedAt = Date.now();
       const rows = await supabase(`reports?id=eq.${encodeURIComponent(item.id)}`, {
         method: "PATCH",
         body: JSON.stringify(toDb(item))
       });
+      await writeLog("update", actor, oldRows[0] || null, rows[0] || null);
       return json(res, 200, fromDb(rows[0]));
     }
 
     if (req.method === "DELETE") {
       const ids = requestUrl.searchParams.getAll("id");
+      const actor = requestUrl.searchParams.get("actor") || "";
       if (!ids.length) return json(res, 400, { error: "id is required" });
 
       for (const id of ids) {
+        const oldRows = await supabase(`reports?id=eq.${encodeURIComponent(id)}&select=*`);
         await supabase(`reports?id=eq.${encodeURIComponent(id)}`, { method: "DELETE" });
+        await writeLog("delete", actor, oldRows[0] || null, null);
       }
       return json(res, 200, { ok: true, count: ids.length });
     }

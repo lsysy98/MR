@@ -226,7 +226,8 @@ async function addData(item) {
   toast("저장되었습니다.");
 }
 async function updateData(item) {
-  var saved = await api("PUT", item);
+  var actor = ownerInput.value.trim() || localStorage.getItem("ownerName") || item.owner || "";
+  var saved = await api("PUT", Object.assign({}, item, { actor: actor }));
   reports = reports.map(function(report) {
     return report.id === saved.id ? saved : report;
   });
@@ -234,8 +235,16 @@ async function updateData(item) {
   toast("수정되었습니다.");
 }
 async function deleteData(id) {
-  if (!confirm("이 보고를 삭제할까요?")) return;
-  await api("DELETE", null, "?id=" + encodeURIComponent(id));
+  var item = reports.find(function(report) { return report.id === id; });
+  if (!item) return;
+  var typed = prompt("삭제하려면 거래처명을 정확히 입력해주세요.\n\n거래처명: " + item.client);
+  if (typed === null) return;
+  if (typed.trim() !== item.client) {
+    toast("거래처명이 일치하지 않아 삭제하지 않았습니다.");
+    return;
+  }
+  var actor = ownerInput.value.trim() || localStorage.getItem("ownerName") || item.owner || "";
+  await api("DELETE", null, "?id=" + encodeURIComponent(id) + "&actor=" + encodeURIComponent(actor));
   reports = reports.filter(function(report) {
     return report.id !== id;
   });
