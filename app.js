@@ -133,6 +133,15 @@ function toast(msg) {
   box.textContent = msg;
   setTimeout(function() { box.textContent = ""; }, 2200);
 }
+function openDatePicker(input) {
+  if (!input) return;
+  if (typeof input.showPicker === "function") {
+    input.showPicker();
+  } else {
+    input.focus();
+    input.click();
+  }
+}
 function updateAmountPreview() {
   var man = amountMan(amountInput.value);
   amountPreview.textContent = man ? money.format(man) + "만원 = " + won(man * 10000) : "1 입력 = 10,000원";
@@ -687,6 +696,11 @@ if (teamDatePicker) {
     render();
   });
 }
+if (teamDateLabel) {
+  teamDateLabel.addEventListener("click", function() {
+    openDatePicker(teamDatePicker);
+  });
+}
 document.getElementById("prevDayBtn").addEventListener("click", function() {
   selectedTeamDate = dateText(addDays(parseDateText(selectedTeamDate), -1));
   openedTeamOwner = "";
@@ -702,6 +716,11 @@ if (teamWeekPicker) {
     selectedWeekStart = dateText(startOfWeekDate(parseDateText(teamWeekPicker.value || todayText)));
     openedTeamOwner = "";
     render();
+  });
+}
+if (teamWeekLabel) {
+  teamWeekLabel.addEventListener("click", function() {
+    openDatePicker(teamWeekPicker);
   });
 }
 document.getElementById("prevWeekBtn").addEventListener("click", function() {
