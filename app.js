@@ -516,8 +516,10 @@ function renderTeamCards(items) {
     var line = document.createElement("div");
     line.className = "team-line";
     var teamNew = document.createElement("span");
+    teamNew.className = "team-count";
     teamNew.textContent = "신규" + summary.new.count;
     var teamGrowth = document.createElement("span");
+    teamGrowth.className = "team-count";
     teamGrowth.textContent = "증대" + summary.growth.count;
     var teamAmount = document.createElement("span");
     teamAmount.className = "team-amount";

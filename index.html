@@ -88,10 +88,10 @@
     .owner-name { font-size: 15px; font-weight: 900; color: var(--text); }
     .owner-line {
       display: grid;
-      grid-template-columns: 54px 54px 42px;
+      grid-template-columns: 42px 42px 42px;
       align-items: center;
       justify-content: flex-end;
-      gap: 6px;
+      gap: 4px;
       white-space: nowrap;
     }
     .owner-count { color: var(--muted); font-size: 12px; font-weight: 800; text-align: right; }
@@ -107,19 +107,17 @@
     }
     .team-line {
       display: grid;
-      grid-template-columns: 54px 54px minmax(86px, 1fr);
-      gap: 6px;
+      grid-template-columns: 42px 42px minmax(104px, 1fr);
+      gap: 5px;
       align-items: center;
-      color: var(--text);
-      font-size: 14px;
-      font-weight: 800;
       white-space: nowrap;
     }
     .team-line span { text-align: right; }
-    .team-line .team-amount { font-variant-numeric: tabular-nums; }
+    .team-line .team-count { color: var(--muted); font-size: 12px; font-weight: 800; }
+    .team-line .team-amount { color: var(--text); font-size: 14px; font-weight: 900; font-variant-numeric: tabular-nums; }
     .period-switch { grid-template-columns: 1fr 1fr; }
     .period-controls { display: grid; gap: 8px; }
-    .day-control, .week-control { display: grid; grid-template-columns: 1fr 1.2fr 1fr; gap: 8px; align-items: center; }
+    .day-control, .week-control { display: grid; grid-template-columns: .8fr minmax(150px, 1.4fr) .8fr; gap: 8px; align-items: center; }
     .date-pick-wrap { position: relative; }
     .date-label, .week-label {
       width: 100%;
@@ -132,6 +130,7 @@
       color: var(--text);
       font-weight: 900;
       cursor: pointer;
+      white-space: nowrap;
     }
     .hidden-date {
       position: absolute;
@@ -213,10 +212,14 @@
       .owner-grid { border-radius: 7px; }
       .owner-button { min-height: 41px; grid-template-columns: 64px 1fr; padding: 7px 10px; }
       .owner-name { font-size: 15px; }
-      .owner-line { grid-template-columns: 48px 48px 38px; gap: 5px; justify-self: end; letter-spacing: 0; }
+      .owner-line { grid-template-columns: 38px 38px 38px; gap: 4px; justify-self: end; letter-spacing: 0; }
       .owner-count { font-size: 11px; }
       .owner-rate { font-size: 11px; padding: 5px 6px; }
-      .team-line { font-size: 13px; letter-spacing: 0; }
+      .team-line { grid-template-columns: 38px 38px minmax(96px, 1fr); gap: 4px; letter-spacing: 0; }
+      .team-line .team-count { font-size: 11px; }
+      .team-line .team-amount { font-size: 13px; }
+      .day-control, .week-control { grid-template-columns: .68fr minmax(154px, 1.64fr) .68fr; gap: 6px; }
+      .date-label, .week-label { min-height: 40px; padding: 0 6px; font-size: 12px; font-weight: 700; letter-spacing: 0; }
       .owner-detail-summary { grid-template-columns: 1fr 1fr; }
       .detail-reset { grid-column: 1 / -1; }
       .report-card { padding: 8px 8px 8px 40px; }
