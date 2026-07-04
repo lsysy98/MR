@@ -155,13 +155,15 @@ function toast(msg) {
 function hideNotice() {
   if (!noticeOverlay) return;
   noticeOverlay.classList.remove("active");
+  noticeOverlay.classList.remove("danger");
   noticeOverlay.setAttribute("aria-hidden", "true");
 }
-function showNotice(msg) {
+function showNotice(msg, type) {
   if (!noticeOverlay || !noticeText) {
     toast(msg);
     return;
   }
+  noticeOverlay.classList.toggle("danger", type === "danger");
   noticeText.textContent = msg;
   noticeOverlay.classList.add("active");
   noticeOverlay.setAttribute("aria-hidden", "false");
@@ -273,7 +275,7 @@ async function deleteData(id) {
   var typed = prompt("삭제하려면 거래처명을 정확히 입력해주세요.\n\n거래처명: " + item.client);
   if (typed === null) return;
   if (typed.trim() !== item.client) {
-    toast("거래처명이 일치하지 않아 삭제하지 않았습니다.");
+    showNotice("거래처명이 정확하지 않아 삭제되지 않았습니다.", "danger");
     return;
   }
   var actor = ownerInput.value.trim() || localStorage.getItem("ownerName") || item.owner || "";
