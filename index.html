@@ -37,7 +37,6 @@
     .form, .body { padding: 12px 16px 16px; display: grid; gap: 12px; }
     label { display: grid; gap: 7px; color: var(--muted); font-size: 13px; }
     .label-muted { color: #8a9691; font-size: 12px; font-weight: 400; }
-    .optional-note { color: #7b8983; font-size: 12px; margin-top: -3px; }
     input, select { width: 100%; min-height: 44px; border: 1px solid #cbd8d1; border-radius: 8px; padding: 10px 12px; background: #fff; color: var(--text); }
     .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     .btn { min-height: 42px; border: 1px solid #bfd0c8; border-radius: 8px; background: #fff; color: #0f5b47; padding: 0 13px; cursor: pointer; }
@@ -288,7 +287,6 @@
         <label>거래처명 <input id="client" type="text" required autocomplete="off"></label>
         <label><span>지점명 <span class="label-muted">(선택)</span></span>
           <input id="branchName" type="text" placeholder="선택 입력" autocomplete="off">
-          <span class="optional-note">입력하지 않아도 저장됩니다.</span>
         </label>
         <label>구분
           <div class="seg">
