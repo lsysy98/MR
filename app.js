@@ -38,6 +38,9 @@ var teamDatePicker = document.getElementById("teamDatePicker");
 var teamWeekControl = document.getElementById("teamWeekControl");
 var teamWeekLabel = document.getElementById("teamWeekLabel");
 var teamWeekPicker = document.getElementById("teamWeekPicker");
+var noticeOverlay = document.getElementById("noticeOverlay");
+var noticeText = document.getElementById("noticeText");
+var noticeOkBtn = document.getElementById("noticeOkBtn");
 
 dateInput.value = todayText;
 if (teamDatePicker) teamDatePicker.value = selectedTeamDate;
@@ -133,6 +136,20 @@ function toast(msg) {
   box.textContent = msg;
   setTimeout(function() { box.textContent = ""; }, 2200);
 }
+function hideNotice() {
+  if (!noticeOverlay) return;
+  noticeOverlay.classList.remove("active");
+  noticeOverlay.setAttribute("aria-hidden", "true");
+}
+function showNotice(msg) {
+  if (!noticeOverlay || !noticeText) {
+    toast(msg);
+    return;
+  }
+  noticeText.textContent = msg;
+  noticeOverlay.classList.add("active");
+  noticeOverlay.setAttribute("aria-hidden", "false");
+}
 function openDatePicker(input) {
   if (!input) return;
   if (typeof input.showPicker === "function") {
@@ -223,7 +240,7 @@ async function addData(item) {
   var saved = await api("POST", item);
   reports.unshift(saved);
   render();
-  toast("저장되었습니다.");
+  showNotice("저장되었습니다.");
 }
 async function updateData(item) {
   var actor = ownerInput.value.trim() || localStorage.getItem("ownerName") || item.owner || "";
@@ -232,7 +249,7 @@ async function updateData(item) {
     return report.id === saved.id ? saved : report;
   });
   render();
-  toast("수정되었습니다.");
+  showNotice("수정되었습니다.");
 }
 async function deleteData(id) {
   var item = reports.find(function(report) { return report.id === id; });
@@ -654,6 +671,14 @@ function startEdit(item) {
 syncCollectionButtons();
 syncTeamPeriodControls();
 
+if (noticeOkBtn) {
+  noticeOkBtn.addEventListener("click", hideNotice);
+}
+if (noticeOverlay) {
+  noticeOverlay.addEventListener("click", function(e) {
+    if (e.target === noticeOverlay) hideNotice();
+  });
+}
 amountInput.addEventListener("input", function() {
   amountInput.value = digits(amountInput.value);
   updateAmountPreview();

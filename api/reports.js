@@ -94,10 +94,14 @@ function logRow(action, actor, beforeRow, afterRow) {
   };
 }
 async function writeLog(action, actor, beforeRow, afterRow) {
-  await supabase("report_logs", {
-    method: "POST",
-    body: JSON.stringify(logRow(action, actor, beforeRow, afterRow))
-  });
+  try {
+    await supabase("report_logs", {
+      method: "POST",
+      body: JSON.stringify(logRow(action, actor, beforeRow, afterRow))
+    });
+  } catch (error) {
+    console.warn("report log skipped:", error.message);
+  }
 }
 
 async function readBody(req) {
