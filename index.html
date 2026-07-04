@@ -36,6 +36,8 @@
     .head { padding: 16px 16px 6px; }
     .form, .body { padding: 12px 16px 16px; display: grid; gap: 12px; }
     label { display: grid; gap: 7px; color: var(--muted); font-size: 13px; }
+    .label-muted { color: #8a9691; font-size: 12px; font-weight: 400; }
+    .optional-note { color: #7b8983; font-size: 12px; margin-top: -3px; }
     input, select { width: 100%; min-height: 44px; border: 1px solid #cbd8d1; border-radius: 8px; padding: 10px 12px; background: #fff; color: var(--text); }
     .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     .btn { min-height: 42px; border: 1px solid #bfd0c8; border-radius: 8px; background: #fff; color: #0f5b47; padding: 0 13px; cursor: pointer; }
@@ -208,12 +210,16 @@
       font-weight: 900;
     }
     .report-top { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px; align-items: start; }
+    .client-wrap { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; min-width: 0; }
     .client { font-weight: 900; font-size: 15px; line-height: 1.25; overflow-wrap: anywhere; }
+    .branch-name { color: var(--muted); font-size: 12px; font-weight: 700; }
     .report-amount { font-weight: 900; font-size: 20px; color: #10251d; line-height: 1.1; white-space: nowrap; }
     .report-info { color: var(--muted); font-size: 12px; display: flex; gap: 6px; flex-wrap: wrap; }
     .report-bottom { display: flex; justify-content: space-between; gap: 6px; align-items: center; }
     .report-actions { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; }
     .report-actions .btn { min-height: 34px; padding: 0 9px; font-size: 13px; }
+    .report-actions .btn.done,
+    .report-actions .btn.pending { max-width: 92px; padding: 0 7px; font-size: 12px; line-height: 1.15; white-space: normal; }
     .badge { display: inline-flex; align-items: center; min-height: 23px; border-radius: 999px; padding: 0 8px; font-size: 12px; font-weight: 800; white-space: nowrap; }
     .badge.new { background: var(--blue-soft); color: var(--blue); }
     .badge.growth { background: var(--amber-soft); color: var(--amber); }
@@ -280,6 +286,10 @@
         </label>
         <label>날짜 <input id="date" type="date" required></label>
         <label>거래처명 <input id="client" type="text" required autocomplete="off"></label>
+        <label><span>지점명 <span class="label-muted">(선택)</span></span>
+          <input id="branchName" type="text" placeholder="선택 입력" autocomplete="off">
+          <span class="optional-note">입력하지 않아도 저장됩니다.</span>
+        </label>
         <label>구분
           <div class="seg">
             <button type="button" class="active" data-type="신규">신규</button>

@@ -76,18 +76,30 @@ function timeText(value) {
   });
 }
 
+function collectionText(data) {
+  if (!data?.collectionYear || !data?.collectionMonth) return "";
+  return `${data.collectionYear}.${String(data.collectionMonth).padStart(2, "0")}`;
+}
+
 function reportLine(data) {
   if (!data) return "-";
   return [
     `담당자: ${data.owner || ""}`,
     `거래처: ${data.client || ""}`,
+    data.branchName ? `지점: ${data.branchName}` : "",
     `날짜: ${data.date || ""}`,
-    `수거월: ${data.collectionYear || ""}.${String(data.collectionMonth || "").padStart(2, "0")}`,
+    `수거월: ${collectionText(data)}`,
     `구분: ${data.type || ""}`,
     `품목: ${data.product || ""}`,
     `금액: ${won(data.amount)}`,
-    `처방입력: ${data.prescriptionDone ? "완료" : "미완료"}`
-  ].join(" / ");
+    `통계입력: ${data.prescriptionDone ? "완료" : "미완료"}`
+  ].filter(Boolean).join(" / ");
+}
+
+function displayValue(key, value) {
+  if (key === "amount") return won(value);
+  if (key === "prescriptionDone") return value ? "완료" : "미완료";
+  return value ?? "";
 }
 
 function changedFields(beforeData, afterData) {
@@ -95,56 +107,55 @@ function changedFields(beforeData, afterData) {
   const labels = {
     owner: "담당자",
     client: "거래처",
+    branchName: "지점명",
     date: "날짜",
     collectionYear: "수거 연도",
     collectionMonth: "수거 월",
     type: "구분",
     product: "품목",
     amount: "금액",
-    prescriptionDone: "처방입력"
+    prescriptionDone: "통계입력"
   };
   return Object.keys(labels).filter((key) => beforeData[key] !== afterData[key]).map((key) => {
-    const beforeValue = key === "amount" ? won(beforeData[key]) : beforeData[key];
-    const afterValue = key === "amount" ? won(afterData[key]) : afterData[key];
-    return `${labels[key]}: ${beforeValue ?? ""} → ${afterValue ?? ""}`;
+    return `${labels[key]}: ${displayValue(key, beforeData[key])} → ${displayValue(key, afterData[key])}`;
   });
 }
 
-function page(rows) {
-  const cards = rows.map((row) => {
-    const beforeData = row.before_data || null;
-    const afterData = row.after_data || null;
-    const actionText = row.action === "delete" ? "삭제" : "수정";
-    const actor = row.actor || afterData?.owner || beforeData?.owner || "-";
-    const client = row.client || afterData?.client || beforeData?.client || "-";
-    const changes = changedFields(beforeData, afterData);
+function logCard(row) {
+  const beforeData = row.before_data || null;
+  const afterData = row.after_data || null;
+  const actionText = row.action === "delete" ? "삭제" : "수정";
+  const actor = row.actor || afterData?.owner || beforeData?.owner || "-";
+  const client = row.client || afterData?.client || beforeData?.client || "-";
+  const changes = changedFields(beforeData, afterData);
 
-    return `
-      <article class="log-card">
-        <div class="log-top">
-          <strong>${esc(actionText)}</strong>
-          <span>${esc(timeText(row.created_at))}</span>
-        </div>
-        <div class="main-line">
-          <b>${esc(client)}</b>
-          <span>${esc(actor)}</span>
-        </div>
+  return `
+    <details class="log-card">
+      <summary>
+        <span class="action ${row.action === "delete" ? "delete" : "update"}">${esc(actionText)}</span>
+        <strong>${esc(client)}</strong>
+        <span>${esc(actor)}</span>
+        <time>${esc(timeText(row.created_at))}</time>
+      </summary>
+      <div class="detail-body">
         ${row.action === "update" ? `
-          <div class="block">
-            <h3>바뀐 내용</h3>
+          <section>
+            <h2>바뀐 내용</h2>
             ${changes.length ? `<ul>${changes.map((item) => `<li>${esc(item)}</li>`).join("")}</ul>` : `<p>변경된 항목을 찾지 못했습니다.</p>`}
-          </div>
+          </section>
           <div class="two">
-            <div class="block"><h3>수정 전</h3><p>${esc(reportLine(beforeData))}</p></div>
-            <div class="block"><h3>수정 후</h3><p>${esc(reportLine(afterData))}</p></div>
+            <section><h2>수정 전</h2><p>${esc(reportLine(beforeData))}</p></section>
+            <section><h2>수정 후</h2><p>${esc(reportLine(afterData))}</p></section>
           </div>
         ` : `
-          <div class="block"><h3>삭제된 내용</h3><p>${esc(reportLine(beforeData))}</p></div>
+          <section><h2>삭제된 내용</h2><p>${esc(reportLine(beforeData))}</p></section>
         `}
-      </article>
-    `;
-  }).join("");
+      </div>
+    </details>
+  `;
+}
 
+function page(rows) {
   return `<!doctype html>
 <html lang="ko">
 <head>
@@ -154,27 +165,31 @@ function page(rows) {
   <style>
     * { box-sizing: border-box; }
     body { margin: 0; background: #f4f7f5; color: #17211c; font-family: "Malgun Gothic", system-ui, sans-serif; }
-    main { max-width: 980px; margin: 0 auto; padding: 18px 14px 32px; }
-    h1 { margin: 0 0 6px; font-size: 24px; }
-    .sub { margin: 0 0 16px; color: #66736d; font-size: 14px; }
-    .log-list { display: grid; gap: 12px; }
-    .log-card { background: #fff; border: 1px solid #d9e2dc; border-radius: 8px; padding: 14px; box-shadow: 0 6px 16px rgba(27,45,37,.07); }
-    .log-top { display: flex; justify-content: space-between; gap: 12px; color: #66736d; font-size: 13px; }
-    .log-top strong { color: #14765c; font-size: 15px; }
-    .main-line { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; margin-top: 8px; padding-bottom: 10px; border-bottom: 1px solid #edf2ef; }
-    .main-line b { font-size: 18px; }
-    .main-line span { color: #66736d; font-weight: 800; }
-    .two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-    .block { margin-top: 10px; padding: 10px; border: 1px solid #e1e9e4; border-radius: 8px; background: #fbfdfc; }
-    h3 { margin: 0 0 6px; font-size: 13px; color: #66736d; }
-    p, ul { margin: 0; line-height: 1.55; font-size: 14px; }
+    main { max-width: 980px; margin: 0 auto; padding: 16px 12px 28px; }
+    h1 { margin: 0 0 5px; font-size: 22px; }
+    .sub { margin: 0 0 12px; color: #66736d; font-size: 13px; }
+    .log-list { display: grid; gap: 7px; }
+    .log-card { background: #fff; border: 1px solid #d9e2dc; border-radius: 8px; box-shadow: 0 4px 12px rgba(27,45,37,.05); overflow: hidden; }
+    summary { min-height: 42px; display: grid; grid-template-columns: 42px minmax(100px, 1fr) 74px 134px; gap: 8px; align-items: center; padding: 8px 10px; cursor: pointer; list-style: none; }
+    summary::-webkit-details-marker { display: none; }
+    .action { justify-self: start; border-radius: 999px; padding: 4px 7px; font-size: 12px; font-weight: 900; }
+    .action.update { background: #e6f5ef; color: #14765c; }
+    .action.delete { background: #fff1f1; color: #c24141; }
+    summary strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; }
+    summary span:not(.action), time { color: #66736d; font-size: 13px; white-space: nowrap; }
+    time { text-align: right; }
+    .detail-body { border-top: 1px solid #edf2ef; padding: 9px; display: grid; gap: 8px; }
+    section { padding: 9px; border: 1px solid #e1e9e4; border-radius: 8px; background: #fbfdfc; }
+    h2 { margin: 0 0 5px; font-size: 13px; color: #66736d; }
+    p, ul { margin: 0; line-height: 1.55; font-size: 13px; }
     ul { padding-left: 18px; }
     li + li { margin-top: 3px; }
-    .empty { padding: 28px; text-align: center; color: #66736d; background: #fff; border: 1px dashed #cbd8d1; border-radius: 8px; }
+    .two { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .empty { padding: 24px; text-align: center; color: #66736d; background: #fff; border: 1px dashed #cbd8d1; border-radius: 8px; }
     @media (max-width: 720px) {
+      summary { grid-template-columns: 40px minmax(82px, 1fr) 58px; }
+      time { grid-column: 2 / -1; text-align: left; font-size: 12px; }
       .two { grid-template-columns: 1fr; }
-      .main-line, .log-top { display: grid; }
-      .main-line b { font-size: 17px; }
     }
   </style>
 </head>
@@ -183,7 +198,7 @@ function page(rows) {
     <h1>변경 기록</h1>
     <p class="sub">최근 수정/삭제 기록 ${rows.length}건</p>
     <div class="log-list">
-      ${rows.length ? cards : `<div class="empty">아직 수정/삭제 기록이 없습니다.</div>`}
+      ${rows.length ? rows.map(logCard).join("") : `<div class="empty">아직 수정/삭제 기록이 없습니다.</div>`}
     </div>
   </main>
 </body>

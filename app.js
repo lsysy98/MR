@@ -23,6 +23,7 @@ var form = document.getElementById("reportForm");
 var ownerInput = document.getElementById("owner");
 var dateInput = document.getElementById("date");
 var clientInput = document.getElementById("client");
+var branchInput = document.getElementById("branchName");
 var productInput = document.getElementById("product");
 var amountInput = document.getElementById("amount");
 var amountPreview = document.getElementById("amountPreview");
@@ -121,6 +122,21 @@ function collectionYearOf(item) {
 }
 function collectionMonthOf(item) {
   return Number(item.collectionMonth || monthOf(item));
+}
+function collectionText(item) {
+  return collectionYearOf(item) + "년 " + collectionMonthOf(item) + "월";
+}
+function normalizeClientName(value) {
+  return String(value || "").trim().replace(/\s+/g, " ");
+}
+function findDuplicateReport(item) {
+  var clientName = normalizeClientName(item.client);
+  return reports.find(function(report) {
+    return report.id !== item.id &&
+      report.owner === item.owner &&
+      report.type === item.type &&
+      normalizeClientName(report.client) === clientName;
+  });
 }
 function typeClass(type) {
   return type === "신규" ? "new" : "growth";
@@ -266,7 +282,7 @@ async function deleteData(id) {
     return report.id !== id;
   });
   render();
-  toast("삭제되었습니다.");
+  showNotice("삭제되었습니다.");
 }
 async function togglePrescription(item) {
   var next = Object.assign({}, item, {
@@ -343,7 +359,7 @@ function prescriptionButton(item) {
   var button = document.createElement("button");
   button.type = "button";
   button.className = "btn " + (item.prescriptionDone ? "done" : "pending");
-  button.textContent = item.prescriptionDone ? "처방완료" : "미완료";
+  button.textContent = item.prescriptionDone ? "통계입력 완료" : "미완료";
   button.addEventListener("click", function(e) {
     e.stopPropagation();
     togglePrescription(item).catch(function(error) {
@@ -363,13 +379,22 @@ function reportCard(item, index) {
 
   var top = document.createElement("div");
   top.className = "report-top";
+  var clientWrap = document.createElement("div");
+  clientWrap.className = "client-wrap";
   var client = document.createElement("div");
   client.className = "client";
   client.textContent = item.client;
+  clientWrap.appendChild(client);
+  if (item.branchName) {
+    var branch = document.createElement("span");
+    branch.className = "branch-name";
+    branch.textContent = item.branchName;
+    clientWrap.appendChild(branch);
+  }
   var amount = document.createElement("div");
   amount.className = "report-amount";
   amount.textContent = won(item.amount);
-  top.appendChild(client);
+  top.appendChild(clientWrap);
   top.appendChild(amount);
 
   var info = document.createElement("div");
@@ -624,6 +649,7 @@ function render() {
 function resetAfterSave() {
   editingId = "";
   clientInput.value = "";
+  if (branchInput) branchInput.value = "";
   productInput.value = "클로르";
   amountInput.value = "";
   selectedType = "신규";
@@ -636,6 +662,7 @@ function resetAfterSave() {
 function resetFormAll() {
   editingId = "";
   clientInput.value = "";
+  if (branchInput) branchInput.value = "";
   productInput.value = "클로르";
   amountInput.value = "";
   dateInput.value = todayText;
@@ -650,6 +677,7 @@ function startEdit(item) {
   ownerInput.value = item.owner;
   dateInput.value = item.date;
   clientInput.value = item.client;
+  if (branchInput) branchInput.value = item.branchName || "";
   productInput.value = item.product;
   amountInput.value = String(Math.round(Number(item.amount || 0) / 10000));
   selectedType = item.type;
@@ -809,6 +837,7 @@ form.addEventListener("submit", async function(e) {
     date: dateInput.value,
     owner: owner,
     client: clientInput.value.trim(),
+    branchName: branchInput ? branchInput.value.trim() : "",
     type: selectedType,
     product: productInput.value,
     amount: amountWon(amountInput.value),
@@ -816,6 +845,18 @@ form.addEventListener("submit", async function(e) {
     collectionMonth: collectionMonth,
     prescriptionDone: Boolean(old.prescriptionDone)
   };
+
+  var duplicate = findDuplicateReport(item);
+  if (duplicate) {
+    var keepSaving = confirm(
+      "이미 등록된 거래처입니다.\n\n" +
+      "담당자: " + duplicate.owner + "\n" +
+      "거래처: " + duplicate.client + "\n" +
+      "기존 입력: " + duplicate.type + " / 통계 수거 " + collectionText(duplicate) + "\n\n" +
+      "그래도 저장할까요?"
+    );
+    if (!keepSaving) return;
+  }
 
   try {
     var wasEditing = Boolean(editingId);
