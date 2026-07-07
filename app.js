@@ -323,6 +323,8 @@ function openCalendar(mode, value) {
   }
 }
 function selectedCalendarDateText() {
+  if (calendarMode === "leaveStart") return leaveStartDate ? leaveStartDate.value : selectedTeamDate;
+  if (calendarMode === "leaveEnd") return leaveEndDate ? leaveEndDate.value : selectedTeamDate;
   return calendarMode === "week" ? selectedWeekStart : selectedTeamDate;
 }
 function renderCalendar() {
@@ -354,7 +356,15 @@ function renderCalendar() {
     if (key === selectedCalendarDateText()) btn.classList.add("selected");
     btn.addEventListener("click", function(selectedKey) {
       return function() {
-        if (calendarMode === "week") {
+        if (calendarMode === "leaveStart") {
+          if (leaveStartDate) leaveStartDate.value = selectedKey;
+          if (leaveEndDate && (!leaveEndDate.value || leaveEndDate.value < selectedKey)) leaveEndDate.value = selectedKey;
+          closeCalendar();
+        } else if (calendarMode === "leaveEnd") {
+          if (leaveEndDate) leaveEndDate.value = selectedKey;
+          if (leaveStartDate && leaveStartDate.value && selectedKey < leaveStartDate.value) leaveStartDate.value = selectedKey;
+          closeCalendar();
+        } else if (calendarMode === "week") {
           selectedWeekStart = dateText(startOfWeekDate(parseDateText(selectedKey)));
           if (teamWeekPicker) teamWeekPicker.value = selectedWeekStart;
           openedTeamOwner = "";
@@ -614,9 +624,15 @@ function renderCompletionPanel() {
   if (completionLoadError) {
     if (completionCount) completionCount.textContent = "완료 상태 연결 실패";
     if (completionMissing) completionMissing.textContent = completionLoadError;
-    if (completeDayBtn) completeDayBtn.disabled = true;
-    if (leaveDayBtn) leaveDayBtn.disabled = true;
-    return;
+    if (completeDayBtn) {
+      completeDayBtn.disabled = false;
+      completeDayBtn.textContent = "내 보고 완료";
+      completeDayBtn.classList.remove("primary");
+    }
+    if (leaveDayBtn) {
+      leaveDayBtn.disabled = false;
+      leaveDayBtn.textContent = "연차 설정";
+    }
   }
 
   var stats = completionStats();
@@ -791,7 +807,11 @@ async function openAnnualLeaveModal() {
     leaveOverlay.classList.add("active");
     leaveOverlay.setAttribute("aria-hidden", "false");
   }
-  await loadOwnerLeaveRows(owner);
+  try {
+    await loadOwnerLeaveRows(owner);
+  } catch (error) {
+    renderLeaveList("연차 목록을 불러오지 못했습니다. Supabase의 daily_completions status 컬럼을 확인해주세요.");
+  }
 }
 function closeAnnualLeaveModal() {
   if (!leaveOverlay) return;
@@ -1400,6 +1420,16 @@ if (leaveCloseBtn) {
 if (leaveOverlay) {
   leaveOverlay.addEventListener("click", function(e) {
     if (e.target === leaveOverlay) closeAnnualLeaveModal();
+  });
+}
+if (leaveStartDate) {
+  leaveStartDate.addEventListener("click", function() {
+    openCalendar("leaveStart", leaveStartDate.value || selectedTeamDate);
+  });
+}
+if (leaveEndDate) {
+  leaveEndDate.addEventListener("click", function() {
+    openCalendar("leaveEnd", leaveEndDate.value || selectedTeamDate);
   });
 }
 if (dayScreenshotBtn) {
