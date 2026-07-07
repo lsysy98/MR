@@ -57,6 +57,12 @@ var leaveEndDate = document.getElementById("leaveEndDate");
 var leaveList = document.getElementById("leaveList");
 var leaveSaveBtn = document.getElementById("leaveSaveBtn");
 var leaveCloseBtn = document.getElementById("leaveCloseBtn");
+var calendarOverlay = document.getElementById("calendarOverlay");
+var calendarTitle = document.getElementById("calendarTitle");
+var calendarDays = document.getElementById("calendarDays");
+var calendarPrevBtn = document.getElementById("calendarPrevBtn");
+var calendarNextBtn = document.getElementById("calendarNextBtn");
+var calendarCloseBtn = document.getElementById("calendarCloseBtn");
 var noticeOverlay = document.getElementById("noticeOverlay");
 var noticeText = document.getElementById("noticeText");
 var noticeOkBtn = document.getElementById("noticeOkBtn");
@@ -66,6 +72,8 @@ var noticeActionHandler = null;
 var noticeLocked = false;
 var ownerLeaveRows = [];
 var editingLeaveRangeDates = [];
+var calendarMode = "day";
+var calendarMonthDate = new Date(today.getFullYear(), today.getMonth(), 1);
 
 dateInput.value = todayText;
 if (teamDatePicker) teamDatePicker.value = selectedTeamDate;
@@ -261,6 +269,11 @@ function hideNotice() {
   noticeActionHandler = null;
   noticeLocked = false;
   if (noticeActionBtn) noticeActionBtn.style.display = "none";
+  if (noticeActionBtn) noticeActionBtn.classList.remove("primary");
+  if (noticeOkBtn) {
+    noticeOkBtn.textContent = "확인";
+    noticeOkBtn.classList.add("primary");
+  }
   if (noticeActions) noticeActions.classList.remove("has-action");
 }
 function showNotice(msg, type, actionLabel, actionHandler, lockOutside) {
@@ -274,6 +287,11 @@ function showNotice(msg, type, actionLabel, actionHandler, lockOutside) {
   if (noticeActionBtn) {
     noticeActionBtn.textContent = actionLabel || "";
     noticeActionBtn.style.display = noticeActionHandler ? "block" : "none";
+    noticeActionBtn.classList.toggle("primary", Boolean(noticeActionHandler));
+  }
+  if (noticeOkBtn) {
+    noticeOkBtn.textContent = noticeActionHandler ? "취소" : "확인";
+    noticeOkBtn.classList.toggle("primary", !noticeActionHandler);
   }
   if (noticeActions) noticeActions.classList.toggle("has-action", Boolean(noticeActionHandler));
   noticeText.textContent = msg;
@@ -287,6 +305,71 @@ function openDatePicker(input) {
   } else {
     input.focus();
     input.click();
+  }
+}
+function closeCalendar() {
+  if (!calendarOverlay) return;
+  calendarOverlay.classList.remove("active");
+  calendarOverlay.setAttribute("aria-hidden", "true");
+}
+function openCalendar(mode, value) {
+  calendarMode = mode;
+  var base = parseDateText(value || todayText);
+  calendarMonthDate = new Date(base.getFullYear(), base.getMonth(), 1);
+  renderCalendar();
+  if (calendarOverlay) {
+    calendarOverlay.classList.add("active");
+    calendarOverlay.setAttribute("aria-hidden", "false");
+  }
+}
+function selectedCalendarDateText() {
+  return calendarMode === "week" ? selectedWeekStart : selectedTeamDate;
+}
+function renderCalendar() {
+  if (!calendarDays || !calendarTitle) return;
+  var year = calendarMonthDate.getFullYear();
+  var month = calendarMonthDate.getMonth();
+  calendarTitle.textContent = year + "년 " + (month + 1) + "월";
+  calendarDays.textContent = "";
+
+  var first = new Date(year, month, 1);
+  var lastDay = new Date(year, month + 1, 0).getDate();
+  for (var blank = 0; blank < first.getDay(); blank += 1) {
+    var empty = document.createElement("button");
+    empty.type = "button";
+    empty.className = "calendar-day blank";
+    empty.disabled = true;
+    calendarDays.appendChild(empty);
+  }
+  for (var day = 1; day <= lastDay; day += 1) {
+    var d = new Date(year, month, day);
+    var key = dateText(d);
+    var btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "calendar-day";
+    btn.textContent = String(day);
+    if (!isWeekdayDate(d)) btn.classList.add("weekend");
+    if (isKoreanHolidayDateText(key)) btn.classList.add("holiday");
+    if (key === todayText) btn.classList.add("today");
+    if (key === selectedCalendarDateText()) btn.classList.add("selected");
+    btn.addEventListener("click", function(selectedKey) {
+      return function() {
+        if (calendarMode === "week") {
+          selectedWeekStart = dateText(startOfWeekDate(parseDateText(selectedKey)));
+          if (teamWeekPicker) teamWeekPicker.value = selectedWeekStart;
+          openedTeamOwner = "";
+          closeCalendar();
+          render();
+        } else {
+          selectedTeamDate = selectedKey;
+          if (teamDatePicker) teamDatePicker.value = selectedTeamDate;
+          openedTeamOwner = "";
+          closeCalendar();
+          loadCompletionsForSelectedDate();
+        }
+      };
+    }(key));
+    calendarDays.appendChild(btn);
   }
 }
 function updateAmountPreview() {
@@ -1389,7 +1472,7 @@ if (teamDatePicker) {
 }
 if (teamDateLabel) {
   teamDateLabel.addEventListener("click", function() {
-    openDatePicker(teamDatePicker);
+    openCalendar("day", selectedTeamDate);
   });
 }
 document.getElementById("prevDayBtn").addEventListener("click", function() {
@@ -1411,7 +1494,27 @@ if (teamWeekPicker) {
 }
 if (teamWeekLabel) {
   teamWeekLabel.addEventListener("click", function() {
-    openDatePicker(teamWeekPicker);
+    openCalendar("week", selectedWeekStart);
+  });
+}
+if (calendarPrevBtn) {
+  calendarPrevBtn.addEventListener("click", function() {
+    calendarMonthDate = new Date(calendarMonthDate.getFullYear(), calendarMonthDate.getMonth() - 1, 1);
+    renderCalendar();
+  });
+}
+if (calendarNextBtn) {
+  calendarNextBtn.addEventListener("click", function() {
+    calendarMonthDate = new Date(calendarMonthDate.getFullYear(), calendarMonthDate.getMonth() + 1, 1);
+    renderCalendar();
+  });
+}
+if (calendarCloseBtn) {
+  calendarCloseBtn.addEventListener("click", closeCalendar);
+}
+if (calendarOverlay) {
+  calendarOverlay.addEventListener("click", function(e) {
+    if (e.target === calendarOverlay) closeCalendar();
   });
 }
 document.getElementById("prevWeekBtn").addEventListener("click", function() {

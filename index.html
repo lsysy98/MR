@@ -132,6 +132,45 @@
     .notice-actions { display: grid; grid-template-columns: 1fr; gap: 8px; }
     .notice-actions.has-action { grid-template-columns: 1fr 1fr; }
     #noticeActionBtn { display: none; }
+    .calendar-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 48;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 18px;
+      background: rgba(23, 33, 28, .24);
+    }
+    .calendar-overlay.active { display: flex; }
+    .calendar-box {
+      width: min(360px, 100%);
+      display: grid;
+      gap: 10px;
+      padding: 16px;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: 0 18px 44px rgba(27,45,37,.22);
+    }
+    .calendar-head { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: center; }
+    .calendar-head strong { text-align: center; font-size: 16px; }
+    .calendar-weekdays, .calendar-days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+    .calendar-weekdays span { color: var(--muted); font-size: 12px; font-weight: 900; text-align: center; }
+    .calendar-day {
+      min-height: 38px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 800;
+      cursor: pointer;
+    }
+    .calendar-day.blank { border-color: transparent; background: transparent; cursor: default; }
+    .calendar-day.holiday, .calendar-day.weekend { background: #fff1f1; border-color: #efc8c8; color: #c24141; }
+    .calendar-day.today { border-color: var(--green); }
+    .calendar-day.selected { background: var(--green); border-color: var(--green); color: #fff; }
     .status { border: 1px solid #cbd8d1; border-radius: 8px; padding: 10px 12px; background: #fbfdfc; color: var(--muted); font-size: 13px; }
     .status.ok { border-color: #98d8bf; background: #ecf9f3; color: #0f5b47; }
     .status.error { border-color: #efb8b8; background: #fff1f1; color: #b42323; }
@@ -219,6 +258,28 @@
       font-weight: 900;
       cursor: pointer;
       white-space: nowrap;
+      position: relative;
+      padding-right: 34px;
+    }
+    .date-label::before, .week-label::before {
+      content: "";
+      position: absolute;
+      right: 14px;
+      top: 13px;
+      width: 14px;
+      height: 14px;
+      border: 2px solid var(--green);
+      border-radius: 3px;
+    }
+    .date-label::after, .week-label::after {
+      content: "";
+      position: absolute;
+      right: 16px;
+      top: 18px;
+      width: 10px;
+      height: 2px;
+      background: var(--green);
+      box-shadow: 0 4px 0 rgba(20,118,92,.25);
     }
     .hidden-date {
       position: absolute;
@@ -515,6 +576,20 @@
         <button class="btn primary" type="button" id="leaveSaveBtn">연차 저장</button>
         <button class="btn wide" type="button" id="leaveCloseBtn">닫기</button>
       </div>
+    </div>
+  </div>
+  <div class="calendar-overlay" id="calendarOverlay" aria-hidden="true">
+    <div class="calendar-box" role="dialog" aria-modal="true" aria-labelledby="calendarTitle">
+      <div class="calendar-head">
+        <button class="btn" type="button" id="calendarPrevBtn">전 달</button>
+        <strong id="calendarTitle">2026년 7월</strong>
+        <button class="btn" type="button" id="calendarNextBtn">다음 달</button>
+      </div>
+      <div class="calendar-weekdays">
+        <span>일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span>
+      </div>
+      <div class="calendar-days" id="calendarDays"></div>
+      <button class="btn" type="button" id="calendarCloseBtn">닫기</button>
     </div>
   </div>
   <div class="notice-overlay" id="noticeOverlay" aria-hidden="true">
