@@ -323,8 +323,8 @@ function openCalendar(mode, value) {
   }
 }
 function selectedCalendarDateText() {
-  if (calendarMode === "leaveStart") return leaveStartDate ? leaveStartDate.value : selectedTeamDate;
-  if (calendarMode === "leaveEnd") return leaveEndDate ? leaveEndDate.value : selectedTeamDate;
+  if (calendarMode === "leaveStart") return leaveDateValue(leaveStartDate) || selectedTeamDate;
+  if (calendarMode === "leaveEnd") return leaveDateValue(leaveEndDate) || selectedTeamDate;
   return calendarMode === "week" ? selectedWeekStart : selectedTeamDate;
 }
 function renderCalendar() {
@@ -357,12 +357,16 @@ function renderCalendar() {
     btn.addEventListener("click", function(selectedKey) {
       return function() {
         if (calendarMode === "leaveStart") {
-          if (leaveStartDate) leaveStartDate.value = selectedKey;
-          if (leaveEndDate && (!leaveEndDate.value || leaveEndDate.value < selectedKey)) leaveEndDate.value = selectedKey;
+          setLeaveDateInput(leaveStartDate, selectedKey);
+          if (leaveEndDate && (!leaveDateValue(leaveEndDate) || leaveDateValue(leaveEndDate) < selectedKey)) {
+            setLeaveDateInput(leaveEndDate, selectedKey);
+          }
           closeCalendar();
         } else if (calendarMode === "leaveEnd") {
-          if (leaveEndDate) leaveEndDate.value = selectedKey;
-          if (leaveStartDate && leaveStartDate.value && selectedKey < leaveStartDate.value) leaveStartDate.value = selectedKey;
+          setLeaveDateInput(leaveEndDate, selectedKey);
+          if (leaveStartDate && leaveDateValue(leaveStartDate) && selectedKey < leaveDateValue(leaveStartDate)) {
+            setLeaveDateInput(leaveStartDate, selectedKey);
+          }
           closeCalendar();
         } else if (calendarMode === "week") {
           selectedWeekStart = dateText(startOfWeekDate(parseDateText(selectedKey)));
@@ -713,6 +717,30 @@ function leaveRangeText(range) {
   if (range.start === range.end) return koreanDateShort(range.start);
   return koreanDateShort(range.start) + "~" + koreanDateShort(range.end);
 }
+function leaveDateInputText(value) {
+  if (!value) return "";
+  var d = parseDateText(value);
+  var days = ["일", "월", "화", "수", "목", "금", "토"];
+  return value + " (" + days[d.getDay()] + ")";
+}
+function leaveDateValue(input) {
+  return input ? (input.dataset.date || input.value || "") : "";
+}
+function setLeaveDateInput(input, value) {
+  if (!input) return;
+  input.dataset.date = value || "";
+  input.value = leaveDateInputText(value);
+}
+function resetLeaveEditState() {
+  editingLeaveRangeDates = [];
+  document.querySelectorAll(".leave-item.editing").forEach(function(item) {
+    item.classList.remove("editing");
+    var editButton = item.querySelector("button");
+    if (editButton) editButton.textContent = "수정";
+  });
+  if (leaveSaveBtn) leaveSaveBtn.textContent = "연차 저장";
+  if (leaveHelp) leaveHelp.textContent = "시작일과 종료일을 선택하면 해당 기간이 모두 연차로 표시됩니다.";
+}
 function groupLeaveRanges(rows) {
   var seen = {};
   var dates = rows
@@ -764,9 +792,16 @@ function renderLeaveList(message) {
     edit.className = "btn";
     edit.textContent = "수정";
     edit.addEventListener("click", function() {
+      document.querySelectorAll(".leave-item.editing").forEach(function(row) {
+        row.classList.remove("editing");
+        var button = row.querySelector("button");
+        if (button) button.textContent = "수정";
+      });
+      item.classList.add("editing");
+      edit.textContent = "수정 중";
       editingLeaveRangeDates = range.dates.slice();
-      if (leaveStartDate) leaveStartDate.value = range.start;
-      if (leaveEndDate) leaveEndDate.value = range.end;
+      setLeaveDateInput(leaveStartDate, range.start);
+      setLeaveDateInput(leaveEndDate, range.end);
       if (leaveSaveBtn) leaveSaveBtn.textContent = "수정 저장";
       if (leaveHelp) leaveHelp.textContent = "날짜를 바꾼 뒤 수정 저장을 누르면 이 연차가 바뀝니다.";
     });
@@ -775,9 +810,12 @@ function renderLeaveList(message) {
     del.className = "btn danger";
     del.textContent = "삭제";
     del.addEventListener("click", function() {
-      deleteLeaveDates(range.dates).catch(function(error) {
-        showNotice("연차 삭제 실패: " + error.message, "danger");
-      });
+      showNotice(leaveRangeText(range) + " 연차를 삭제합니다.", "danger", "삭제", function() {
+        hideNotice();
+        deleteLeaveDates(range.dates).catch(function(error) {
+          showNotice("연차 삭제 실패: " + error.message, "danger");
+        });
+      }, true);
     });
     item.appendChild(text);
     item.appendChild(edit);
@@ -796,12 +834,10 @@ async function openAnnualLeaveModal() {
     return;
   }
 
-  editingLeaveRangeDates = [];
+  resetLeaveEditState();
   if (leaveTitle) leaveTitle.textContent = owner + " 연차 설정";
-  if (leaveHelp) leaveHelp.textContent = "시작일과 종료일을 선택하면 해당 기간이 모두 연차로 표시됩니다.";
-  if (leaveStartDate) leaveStartDate.value = selectedTeamDate;
-  if (leaveEndDate) leaveEndDate.value = selectedTeamDate;
-  if (leaveSaveBtn) leaveSaveBtn.textContent = "연차 저장";
+  setLeaveDateInput(leaveStartDate, selectedTeamDate);
+  setLeaveDateInput(leaveEndDate, selectedTeamDate);
   renderLeaveList("연차 목록을 불러오는 중입니다.");
   if (leaveOverlay) {
     leaveOverlay.classList.add("active");
@@ -826,7 +862,7 @@ async function saveAnnualLeaveRange() {
   }
 
   var beforeStats = completionStats();
-  var dates = datesBetween(leaveStartDate ? leaveStartDate.value : "", leaveEndDate ? leaveEndDate.value : "");
+  var dates = datesBetween(leaveDateValue(leaveStartDate), leaveDateValue(leaveEndDate));
   if (!dates.length) {
     showNotice("시작일과 종료일을 올바르게 선택해주세요.", "danger");
     return;
@@ -842,9 +878,7 @@ async function saveAnnualLeaveRange() {
   }));
   await loadCompletionsForSelectedDate(true);
   await loadOwnerLeaveRows(owner);
-  editingLeaveRangeDates = [];
-  if (leaveSaveBtn) leaveSaveBtn.textContent = "연차 저장";
-  if (leaveHelp) leaveHelp.textContent = "시작일과 종료일을 선택하면 해당 기간이 모두 연차로 표시됩니다.";
+  resetLeaveEditState();
   render();
 
   var afterStats = completionStats();
@@ -870,11 +904,9 @@ async function deleteLeaveDates(dates) {
   }));
   await loadCompletionsForSelectedDate(true);
   await loadOwnerLeaveRows(owner);
-  editingLeaveRangeDates = [];
-  if (leaveSaveBtn) leaveSaveBtn.textContent = "연차 저장";
-  if (leaveStartDate) leaveStartDate.value = selectedTeamDate;
-  if (leaveEndDate) leaveEndDate.value = selectedTeamDate;
-  if (leaveHelp) leaveHelp.textContent = "시작일과 종료일을 선택하면 해당 기간이 모두 연차로 표시됩니다.";
+  resetLeaveEditState();
+  setLeaveDateInput(leaveStartDate, selectedTeamDate);
+  setLeaveDateInput(leaveEndDate, selectedTeamDate);
   render();
   showNotice("연차를 삭제했습니다.");
 }
@@ -1218,7 +1250,7 @@ function makeTeamScreenshot(period) {
   var stats = completionStats();
   var width = 430;
   var rowHeight = 52;
-  var height = 246 + groups.length * rowHeight + (isWeek ? 10 : 42);
+  var height = 220 + groups.length * rowHeight;
   var canvas = document.createElement("canvas");
   canvas.width = width;
   canvas.height = height;
@@ -1254,13 +1286,6 @@ function makeTeamScreenshot(period) {
   });
 
   var y = 202;
-  if (!isWeek) {
-    ctx.fillStyle = "#14765c";
-    ctx.font = "900 15px Malgun Gothic, sans-serif";
-    ctx.fillText("완료 " + stats.done.length + " · 연차 " + stats.leave.length, 22, y);
-    y += 26;
-  }
-
   groups.forEach(function(group) {
     var status = !isWeek ? (stats.statusMap[group.owner] || "missing") : "";
     var bg = status === "done" ? "#edf9f4" : (status === "leave" ? "#f7f8f7" : "#ffffff");
@@ -1424,12 +1449,12 @@ if (leaveOverlay) {
 }
 if (leaveStartDate) {
   leaveStartDate.addEventListener("click", function() {
-    openCalendar("leaveStart", leaveStartDate.value || selectedTeamDate);
+    openCalendar("leaveStart", leaveDateValue(leaveStartDate) || selectedTeamDate);
   });
 }
 if (leaveEndDate) {
   leaveEndDate.addEventListener("click", function() {
-    openCalendar("leaveEnd", leaveEndDate.value || selectedTeamDate);
+    openCalendar("leaveEnd", leaveDateValue(leaveEndDate) || selectedTeamDate);
   });
 }
 if (dayScreenshotBtn) {

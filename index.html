@@ -126,6 +126,18 @@
       border-radius: 8px;
       background: #fbfdfc;
     }
+    .leave-item.editing {
+      border-color: var(--green);
+      background: var(--green-soft);
+      box-shadow: inset 4px 0 0 var(--green);
+    }
+    .leave-item.editing span::after {
+      content: " 수정 중";
+      margin-left: 6px;
+      color: var(--green);
+      font-size: 12px;
+      font-weight: 900;
+    }
     .leave-item span { font-size: 13px; font-weight: 800; }
     .leave-item .btn { min-height: 34px; padding: 0 9px; font-size: 12px; }
     .leave-empty { color: var(--muted); font-size: 13px; padding: 8px; border: 1px dashed var(--line); border-radius: 8px; }
