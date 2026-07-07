@@ -792,6 +792,12 @@ function renderLeaveList(message) {
     edit.className = "btn";
     edit.textContent = "수정";
     edit.addEventListener("click", function() {
+      if (item.classList.contains("editing")) {
+        resetLeaveEditState();
+        setLeaveDateInput(leaveStartDate, selectedTeamDate);
+        setLeaveDateInput(leaveEndDate, selectedTeamDate);
+        return;
+      }
       document.querySelectorAll(".leave-item.editing").forEach(function(row) {
         row.classList.remove("editing");
         var button = row.querySelector("button");
@@ -1293,10 +1299,10 @@ function makeTeamScreenshot(period) {
     ctx.fillStyle = "#17211c";
     ctx.font = "900 17px Malgun Gothic, sans-serif";
     ctx.fillText(group.owner, 36, y + 3);
-    if (!isWeek) {
-      ctx.fillStyle = status === "done" ? "#14765c" : (status === "leave" ? "#7b8580" : "#d13b3b");
+    if (!isWeek && status === "leave") {
+      ctx.fillStyle = "#7b8580";
       ctx.font = "900 12px Malgun Gothic, sans-serif";
-      ctx.fillText(dailyStatusLabel(status), 92, y + 2);
+      ctx.fillText("연차", 92, y + 2);
     }
     ctx.fillStyle = "#66736d";
     ctx.font = "800 13px Malgun Gothic, sans-serif";
