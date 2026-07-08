@@ -70,6 +70,7 @@ var noticeActions = document.getElementById("noticeActions");
 var noticeActionBtn = document.getElementById("noticeActionBtn");
 var noticeActionHandler = null;
 var noticeLocked = false;
+var noticeActionRequired = false;
 var ownerLeaveRows = [];
 var editingLeaveRangeDates = [];
 var calendarMode = "day";
@@ -187,9 +188,15 @@ function downloadResolvedScreenshot() {
 }
 function showAllResolvedNotice() {
   if (shouldCaptureWeeklyForDate(selectedTeamDate)) {
-    showNotice("모든 담당자의 일일보고가 완료되었습니다. " + weeklyCaptureMessage(selectedTeamDate), "", "주간 캡쳐 저장", downloadWeekScreenshot, true);
+    showNotice("모든 담당자의 일일보고가 완료되었습니다. " + weeklyCaptureMessage(selectedTeamDate), "", "주간 캡쳐 저장", function() {
+      downloadWeekScreenshot();
+      hideNotice();
+    }, true, true);
   } else {
-    showNotice("모든 담당자의 일일보고가 완료되었습니다. 스크린샷을 저장해주세요.", "", "스크린샷 저장", downloadDayScreenshot, true);
+    showNotice("모든 담당자의 일일보고가 완료되었습니다. 스크린샷을 저장해야 넘어갈 수 있습니다.", "", "스크린샷 저장", function() {
+      downloadDayScreenshot();
+      hideNotice();
+    }, true, true);
   }
 }
 function nextCollectionMonth(d) {
@@ -219,6 +226,10 @@ function amountWon(v) {
 function won(v) {
   var n = Number(v || 0);
   return n ? money.format(n) + "원" : "0원";
+}
+function wonMan(v) {
+  var n = Number(v || 0);
+  return n ? money.format(Math.round(n / 10000)) + "만원" : "0원";
 }
 function yearOf(x) {
   return x.date ? Number(String(x.date).slice(0, 4)) : currentYear;
@@ -268,15 +279,20 @@ function hideNotice() {
   noticeOverlay.setAttribute("aria-hidden", "true");
   noticeActionHandler = null;
   noticeLocked = false;
+  noticeActionRequired = false;
   if (noticeActionBtn) noticeActionBtn.style.display = "none";
   if (noticeActionBtn) noticeActionBtn.classList.remove("primary");
   if (noticeOkBtn) {
+    noticeOkBtn.style.display = "block";
     noticeOkBtn.textContent = "확인";
     noticeOkBtn.classList.add("primary");
   }
-  if (noticeActions) noticeActions.classList.remove("has-action");
+  if (noticeActions) {
+    noticeActions.classList.remove("has-action");
+    noticeActions.classList.remove("action-required");
+  }
 }
-function showNotice(msg, type, actionLabel, actionHandler, lockOutside) {
+function showNotice(msg, type, actionLabel, actionHandler, lockOutside, requireAction) {
   if (!noticeOverlay || !noticeText) {
     toast(msg);
     return;
@@ -284,16 +300,21 @@ function showNotice(msg, type, actionLabel, actionHandler, lockOutside) {
   noticeOverlay.classList.toggle("danger", type === "danger");
   noticeActionHandler = typeof actionHandler === "function" ? actionHandler : null;
   noticeLocked = Boolean(lockOutside);
+  noticeActionRequired = Boolean(requireAction);
   if (noticeActionBtn) {
     noticeActionBtn.textContent = actionLabel || "";
     noticeActionBtn.style.display = noticeActionHandler ? "block" : "none";
     noticeActionBtn.classList.toggle("primary", Boolean(noticeActionHandler));
   }
   if (noticeOkBtn) {
+    noticeOkBtn.style.display = noticeActionRequired ? "none" : "block";
     noticeOkBtn.textContent = noticeActionHandler ? "취소" : "확인";
     noticeOkBtn.classList.toggle("primary", !noticeActionHandler);
   }
-  if (noticeActions) noticeActions.classList.toggle("has-action", Boolean(noticeActionHandler));
+  if (noticeActions) {
+    noticeActions.classList.toggle("has-action", Boolean(noticeActionHandler));
+    noticeActions.classList.toggle("action-required", noticeActionRequired);
+  }
   noticeText.textContent = msg;
   noticeOverlay.classList.add("active");
   noticeOverlay.setAttribute("aria-hidden", "false");
@@ -388,7 +409,7 @@ function renderCalendar() {
 }
 function updateAmountPreview() {
   var man = amountMan(amountInput.value);
-  amountPreview.textContent = man ? money.format(man) + "만원 = " + won(man * 10000) : "1 입력 = 10,000원";
+  amountPreview.textContent = man ? money.format(man) + "만원" : "1 입력 = 1만원";
 }
 function updateTypeButtons() {
   document.querySelectorAll("[data-type]").forEach(function(button) {
@@ -482,11 +503,11 @@ async function loadData() {
   status("", "");
   render();
 }
-async function addData(item) {
+async function addData(item, skipNotice) {
   var saved = await api("POST", item);
   reports.unshift(saved);
   render();
-  showNotice("저장되었습니다.");
+  if (!skipNotice) showNotice("저장되었습니다.");
 }
 async function updateData(item) {
   var actor = ownerInput.value.trim() || localStorage.getItem("ownerName") || item.owner || "";
@@ -513,6 +534,18 @@ async function deleteData(id) {
   });
   render();
   showNotice("삭제되었습니다.");
+}
+function askCompleteAfterSave(owner, reportDate) {
+  var targetDate = reportDate || todayText;
+  var message = targetDate === todayText
+    ? "저장되었습니다. 오늘 보고 완료하시겠습니까?"
+    : "저장되었습니다. 이 날짜의 보고를 완료하시겠습니까?";
+  showNotice(message, "", "완료", function() {
+    hideNotice();
+    setDailyCompleteFor(owner, targetDate, true).catch(function(error) {
+      showNotice("완료 처리 실패: " + error.message, "danger");
+    });
+  });
 }
 async function togglePrescription(item) {
   var next = Object.assign({}, item, {
@@ -612,12 +645,13 @@ function renderCompletionPanel() {
   if (!completionPanel) return;
 
   var isDay = selectedTeamPeriod === "day";
+  completionPanel.style.display = isDay ? "grid" : "none";
   completionPanel.classList.toggle("week-only", !isDay);
   if (completionSummary) completionSummary.style.display = "none";
   if (completeDayBtn) completeDayBtn.style.display = isDay ? "inline-flex" : "none";
   if (leaveDayBtn) leaveDayBtn.style.display = isDay ? "inline-flex" : "none";
-  if (dayScreenshotBtn) dayScreenshotBtn.style.display = isDay ? "inline-flex" : "none";
-  if (weekScreenshotBtn) weekScreenshotBtn.style.display = isDay ? "none" : "inline-flex";
+  if (dayScreenshotBtn) dayScreenshotBtn.style.display = "none";
+  if (weekScreenshotBtn) weekScreenshotBtn.style.display = "none";
 
   if (!isDay) {
     if (completionCount) completionCount.textContent = "주간현황";
@@ -662,6 +696,45 @@ function currentOwnerName() {
   var owner = ownerInput.value.trim() || localStorage.getItem("ownerName") || "";
   return ownerNames.indexOf(owner) >= 0 ? owner : "";
 }
+async function setDailyCompleteFor(owner, targetDate, showDoneNotice) {
+  if (!owner || ownerNames.indexOf(owner) < 0) {
+    showNotice("담당자 이름을 먼저 선택해주세요.", "danger");
+    return;
+  }
+
+  var previousDate = selectedTeamDate;
+  if (targetDate && targetDate !== selectedTeamDate) {
+    selectedTeamDate = targetDate;
+    if (teamDatePicker) teamDatePicker.value = selectedTeamDate;
+    await loadCompletionsForSelectedDate(true);
+  }
+
+  var beforeStats = completionStats();
+  if (beforeStats.statusMap[owner] === "done") {
+    if (showDoneNotice) showNotice("이미 완료 처리되어 있습니다.");
+    if (previousDate !== selectedTeamDate) render();
+    return;
+  }
+
+  var saved = await completionApi("POST", { date: selectedTeamDate, owner: owner, status: "done" });
+  var found = false;
+  dailyCompletions = dailyCompletions.map(function(item) {
+    if (item.owner === saved.owner && item.date === saved.date) {
+      found = true;
+      return saved;
+    }
+    return item;
+  });
+  if (!found) dailyCompletions.push(saved);
+  render();
+
+  var afterStats = completionStats();
+  if (!beforeStats.allResolved && afterStats.allResolved) {
+    showAllResolvedNotice();
+  } else if (showDoneNotice) {
+    showNotice("완료 처리되었습니다.");
+  }
+}
 async function markDailyComplete() {
   var owner = currentOwnerName();
   if (!owner) {
@@ -678,24 +751,7 @@ async function markDailyComplete() {
     showNotice("미완료로 변경되었습니다.");
     return;
   }
-  var saved = await completionApi("POST", { date: selectedTeamDate, owner: owner, status: "done" });
-  var found = false;
-  dailyCompletions = dailyCompletions.map(function(item) {
-    if (item.owner === saved.owner && item.date === saved.date) {
-      found = true;
-      return saved;
-    }
-    return item;
-  });
-  if (!found) dailyCompletions.push(saved);
-  render();
-
-  var afterStats = completionStats();
-  if (!beforeStats.allResolved && afterStats.allResolved) {
-    showAllResolvedNotice();
-  } else {
-    showNotice("완료 처리되었습니다.");
-  }
+  await setDailyCompleteFor(owner, selectedTeamDate, true);
 }
 function datesBetween(startText, endText) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(startText) || !/^\d{4}-\d{2}-\d{2}$/.test(endText)) return [];
@@ -1274,9 +1330,9 @@ function makeTeamScreenshot(period) {
   var boxY = 86;
   var boxW = 124;
   [
-    ["전체", won(summary.total.amount), summary.total.count + "건"],
-    ["신규", won(summary.new.amount), summary.new.count + "건"],
-    ["매출증대", won(summary.growth.amount), summary.growth.count + "건"]
+    ["전체", wonMan(summary.total.amount), summary.total.count + "건"],
+    ["신규", wonMan(summary.new.amount), summary.new.count + "건"],
+    ["매출증대", wonMan(summary.growth.amount), summary.growth.count + "건"]
   ].forEach(function(box, index) {
     var x = 22 + index * (boxW + 8);
     drawRoundedBox(ctx, x, boxY, boxW, 82, "#ffffff", "#d9e2dc");
@@ -1335,22 +1391,22 @@ function render() {
   syncMonthPicker();
   syncTeamPeriodControls();
   renderCompletionPanel();
-  document.getElementById("totalAmount").textContent = won(summary.total.amount);
+  document.getElementById("totalAmount").textContent = wonMan(summary.total.amount);
   document.getElementById("totalCount").textContent = summary.total.count + "건";
-  document.getElementById("newAmount").textContent = won(summary.new.amount);
+  document.getElementById("newAmount").textContent = wonMan(summary.new.amount);
   document.getElementById("newCount").textContent = summary.new.count + "건";
-  document.getElementById("growthAmount").textContent = won(summary.growth.amount);
+  document.getElementById("growthAmount").textContent = wonMan(summary.growth.amount);
   document.getElementById("growthCount").textContent = summary.growth.count + "건";
   document.getElementById("doneRate").textContent = achievementRate + "%";
-  document.getElementById("doneCount").textContent = "총매출 " + won(summary.total.amount) + " / 목표 " + won(targetAmount);
+  document.getElementById("doneCount").textContent = "총매출 " + wonMan(summary.total.amount) + " / 목표 " + wonMan(targetAmount);
   document.getElementById("empty").style.display = items.length ? "none" : "block";
   renderOwnerCards(items);
 
-  document.getElementById("todayTotalAmount").textContent = won(teamSummary.total.amount);
+  document.getElementById("todayTotalAmount").textContent = wonMan(teamSummary.total.amount);
   document.getElementById("todayTotalCount").textContent = teamSummary.total.count + "건";
-  document.getElementById("todayNewAmount").textContent = won(teamSummary.new.amount);
+  document.getElementById("todayNewAmount").textContent = wonMan(teamSummary.new.amount);
   document.getElementById("todayNewCount").textContent = teamSummary.new.count + "건";
-  document.getElementById("todayGrowthAmount").textContent = won(teamSummary.growth.amount);
+  document.getElementById("todayGrowthAmount").textContent = wonMan(teamSummary.growth.amount);
   document.getElementById("todayGrowthCount").textContent = teamSummary.growth.count + "건";
   if (todayEmpty) {
     todayEmpty.textContent = selectedTeamPeriod === "week" ? "선택한 주의 보고가 없습니다." : "선택한 날짜의 보고가 없습니다.";
@@ -1654,7 +1710,10 @@ form.addEventListener("submit", async function(e) {
   try {
     var wasEditing = Boolean(editingId);
     if (wasEditing) await updateData(item);
-    else await addData(item);
+    else {
+      await addData(item, true);
+      askCompleteAfterSave(owner, item.date);
+    }
     resetAfterSave();
   } catch (error) {
     status("저장 실패: " + error.message, "error");
