@@ -187,8 +187,8 @@ function isWeekendDateText(value) {
 }
 function weekendBlockMessage() {
   return calendarMode === "formDate"
-    ? "선택한 날짜는 주말이라 못 올립니다."
-    : "토, 일요일은 조회할 수 없습니다.";
+    ? "주말에는 거래처 입력이 불가능합니다. 다른 날짜를 선택해주세요."
+    : "주말에는 일일현황을 조회할 수 없습니다. 다른 날짜를 선택해주세요.";
 }
 function nextWeekdayText(value, delta) {
   var cursor = parseDateText(value);
@@ -1987,7 +1987,7 @@ form.addEventListener("submit", async function(e) {
     return;
   }
   if (isWeekendDateText(reportDate)) {
-    showNotice("선택한 날짜는 주말이라 못 올립니다.", "danger");
+    showNotice("주말에는 거래처 입력이 불가능합니다. 다른 날짜를 선택해주세요.", "danger");
     return;
   }
 
