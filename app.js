@@ -41,6 +41,16 @@ var teamDatePicker = document.getElementById("teamDatePicker");
 var teamWeekControl = document.getElementById("teamWeekControl");
 var teamWeekLabel = document.getElementById("teamWeekLabel");
 var teamWeekPicker = document.getElementById("teamWeekPicker");
+var weeklyReportTools = document.getElementById("weeklyReportTools");
+var weeklyReportStart = document.getElementById("weeklyReportStart");
+var weeklyReportEnd = document.getElementById("weeklyReportEnd");
+var copyWeeklyReportBtn = document.getElementById("copyWeeklyReportBtn");
+var weeklyReportPanel = document.getElementById("weeklyReportPanel");
+var weeklyReportRangeBox = document.getElementById("weeklyReportRange");
+var weeklyDateToggleBtn = document.getElementById("weeklyDateToggleBtn");
+var weeklyReportPreview = document.getElementById("weeklyReportPreview");
+var confirmCopyWeeklyReportBtn = document.getElementById("confirmCopyWeeklyReportBtn");
+var closeWeeklyReportBtn = document.getElementById("closeWeeklyReportBtn");
 var completionPanel = document.getElementById("completionPanel");
 var completionSummary = document.getElementById("completionSummary");
 var completionCount = document.getElementById("completionCount");
@@ -62,6 +72,7 @@ var calendarTitle = document.getElementById("calendarTitle");
 var calendarDays = document.getElementById("calendarDays");
 var calendarPrevBtn = document.getElementById("calendarPrevBtn");
 var calendarNextBtn = document.getElementById("calendarNextBtn");
+var calendarTodayBtn = document.getElementById("calendarTodayBtn");
 var calendarCloseBtn = document.getElementById("calendarCloseBtn");
 var noticeOverlay = document.getElementById("noticeOverlay");
 var noticeText = document.getElementById("noticeText");
@@ -137,6 +148,24 @@ function weekLabelFromStart(startText) {
   var firstOffset = (first.getDay() + 6) % 7;
   var weekNo = Math.ceil((base.getDate() + firstOffset) / 7);
   return (base.getMonth() + 1) + "월 " + weekNo + "주차";
+}
+function weekMonthInfo(startText) {
+  var base = addDays(parseDateText(startText || selectedWeekStart), 3);
+  return { year: base.getFullYear(), month: base.getMonth() + 1 };
+}
+function clampDateToMonth(value, info) {
+  var date = parseDateText(value);
+  var first = new Date(info.year, info.month - 1, 1);
+  var last = new Date(info.year, info.month, 0);
+  if (date < first) date = first;
+  if (date > last) date = last;
+  return dateText(date);
+}
+function weekNumberOfDate(value) {
+  var d = parseDateText(value);
+  var first = new Date(d.getFullYear(), d.getMonth(), 1);
+  var firstOffset = (first.getDay() + 6) % 7;
+  return Math.ceil((d.getDate() + firstOffset) / 7);
 }
 function dayLabel(value) {
   var d = parseDateText(value);
@@ -267,6 +296,13 @@ function status(message, type) {
   statusBox.textContent = message;
   statusBox.className = "status " + (type || "");
 }
+window.addEventListener("error", function(event) {
+  status("화면 오류: " + (event.message || "알 수 없는 오류"), "error");
+});
+window.addEventListener("unhandledrejection", function(event) {
+  var reason = event.reason && event.reason.message ? event.reason.message : String(event.reason || "알 수 없는 오류");
+  status("화면 오류: " + reason, "error");
+});
 function toast(msg) {
   var box = document.getElementById("toast");
   box.textContent = msg;
@@ -346,7 +382,51 @@ function openCalendar(mode, value) {
 function selectedCalendarDateText() {
   if (calendarMode === "leaveStart") return leaveDateValue(leaveStartDate) || selectedTeamDate;
   if (calendarMode === "leaveEnd") return leaveDateValue(leaveEndDate) || selectedTeamDate;
+  if (calendarMode === "weeklyStart") return leaveDateValue(weeklyReportStart) || selectedTeamDate;
+  if (calendarMode === "weeklyEnd") return leaveDateValue(weeklyReportEnd) || selectedTeamDate;
   return calendarMode === "week" ? selectedWeekStart : selectedTeamDate;
+}
+function applyCalendarDate(selectedKey) {
+  if (calendarMode === "leaveStart") {
+    setLeaveDateInput(leaveStartDate, selectedKey);
+    if (leaveEndDate && (!leaveDateValue(leaveEndDate) || leaveDateValue(leaveEndDate) < selectedKey)) {
+      setLeaveDateInput(leaveEndDate, selectedKey);
+    }
+    closeCalendar();
+  } else if (calendarMode === "leaveEnd") {
+    setLeaveDateInput(leaveEndDate, selectedKey);
+    if (leaveStartDate && leaveDateValue(leaveStartDate) && selectedKey < leaveDateValue(leaveStartDate)) {
+      setLeaveDateInput(leaveStartDate, selectedKey);
+    }
+    closeCalendar();
+  } else if (calendarMode === "weeklyStart") {
+    setLeaveDateInput(weeklyReportStart, selectedKey);
+    if (weeklyReportEnd && (!leaveDateValue(weeklyReportEnd) || leaveDateValue(weeklyReportEnd) < selectedKey)) {
+      setLeaveDateInput(weeklyReportEnd, selectedKey);
+    }
+    updateWeeklyReportPreview();
+    closeCalendar();
+  } else if (calendarMode === "weeklyEnd") {
+    setLeaveDateInput(weeklyReportEnd, selectedKey);
+    if (weeklyReportStart && leaveDateValue(weeklyReportStart) && selectedKey < leaveDateValue(weeklyReportStart)) {
+      setLeaveDateInput(weeklyReportStart, selectedKey);
+    }
+    updateWeeklyReportPreview();
+    closeCalendar();
+  } else if (calendarMode === "week") {
+    selectedWeekStart = dateText(startOfWeekDate(parseDateText(selectedKey)));
+    if (teamWeekPicker) teamWeekPicker.value = selectedWeekStart;
+    setDefaultWeeklyReportRange();
+    openedTeamOwner = "";
+    closeCalendar();
+    render();
+  } else {
+    selectedTeamDate = selectedKey;
+    if (teamDatePicker) teamDatePicker.value = selectedTeamDate;
+    openedTeamOwner = "";
+    closeCalendar();
+    loadCompletionsForSelectedDate();
+  }
 }
 function renderCalendar() {
   if (!calendarDays || !calendarTitle) return;
@@ -377,31 +457,7 @@ function renderCalendar() {
     if (key === selectedCalendarDateText()) btn.classList.add("selected");
     btn.addEventListener("click", function(selectedKey) {
       return function() {
-        if (calendarMode === "leaveStart") {
-          setLeaveDateInput(leaveStartDate, selectedKey);
-          if (leaveEndDate && (!leaveDateValue(leaveEndDate) || leaveDateValue(leaveEndDate) < selectedKey)) {
-            setLeaveDateInput(leaveEndDate, selectedKey);
-          }
-          closeCalendar();
-        } else if (calendarMode === "leaveEnd") {
-          setLeaveDateInput(leaveEndDate, selectedKey);
-          if (leaveStartDate && leaveDateValue(leaveStartDate) && selectedKey < leaveDateValue(leaveStartDate)) {
-            setLeaveDateInput(leaveStartDate, selectedKey);
-          }
-          closeCalendar();
-        } else if (calendarMode === "week") {
-          selectedWeekStart = dateText(startOfWeekDate(parseDateText(selectedKey)));
-          if (teamWeekPicker) teamWeekPicker.value = selectedWeekStart;
-          openedTeamOwner = "";
-          closeCalendar();
-          render();
-        } else {
-          selectedTeamDate = selectedKey;
-          if (teamDatePicker) teamDatePicker.value = selectedTeamDate;
-          openedTeamOwner = "";
-          closeCalendar();
-          loadCompletionsForSelectedDate();
-        }
+        applyCalendarDate(selectedKey);
       };
     }(key));
     calendarDays.appendChild(btn);
@@ -443,6 +499,12 @@ function syncTeamPeriodControls() {
   if (teamWeekPicker) {
     teamWeekPicker.value = selectedWeekStart;
   }
+  if (weeklyReportTools) {
+    weeklyReportTools.style.display = selectedTeamPeriod === "week" ? "grid" : "none";
+  }
+  if (selectedTeamPeriod !== "week") {
+    closeWeeklyReportPanel();
+  }
 }
 function moveCollectionMonth(delta) {
   var d = new Date(collectionYear, collectionMonth - 1 + delta, 1);
@@ -470,21 +532,33 @@ function resetToCurrentMonth() {
   render();
 }
 
+async function requestJson(url, options, timeoutMs) {
+  var controller = typeof AbortController !== "undefined" ? new AbortController() : null;
+  var timer = controller ? setTimeout(function() { controller.abort(); }, timeoutMs || 12000) : null;
+  if (controller) options.signal = controller.signal;
+  try {
+    var response = await fetch(url, options);
+    var data = await response.json().catch(function() { return {}; });
+    if (!response.ok) throw new Error(data.error || "요청 실패");
+    return data;
+  } catch (error) {
+    if (error.name === "AbortError") {
+      throw new Error("서버 응답이 너무 늦습니다. Vercel 환경변수 또는 Supabase 연결을 확인해주세요.");
+    }
+    throw error;
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
 async function api(method, body, query) {
   var options = { method: method, headers: { "Content-Type": "application/json" } };
   if (body) options.body = JSON.stringify(body);
-  var response = await fetch("/api/reports" + (query || ""), options);
-  var data = await response.json().catch(function() { return {}; });
-  if (!response.ok) throw new Error(data.error || "요청 실패");
-  return data;
+  return requestJson("/api/reports" + (query || ""), options, 12000);
 }
 async function completionApi(method, body, query) {
   var options = { method: method, headers: { "Content-Type": "application/json" } };
   if (body) options.body = JSON.stringify(body);
-  var response = await fetch("/api/completions" + (query || ""), options);
-  var data = await response.json().catch(function() { return {}; });
-  if (!response.ok) throw new Error(data.error || "완료 상태 요청 실패");
-  return data;
+  return requestJson("/api/completions" + (query || ""), options, 8000);
 }
 async function loadCompletionsForSelectedDate(skipRender) {
   try {
@@ -497,11 +571,11 @@ async function loadCompletionsForSelectedDate(skipRender) {
   if (!skipRender) render();
 }
 async function loadData() {
-  status("Supabase 저장소와 연결 확인 중입니다.", "");
+  status("보고 데이터를 불러오는 중입니다.", "");
   reports = await api("GET");
-  await loadCompletionsForSelectedDate(true);
   status("", "");
   render();
+  loadCompletionsForSelectedDate();
 }
 async function addData(item, skipNotice) {
   var saved = await api("POST", item);
@@ -586,18 +660,170 @@ function monthlyItems() {
 }
 function weekRange() {
   var start = parseDateText(selectedWeekStart);
-  var end = addDays(start, 6);
+  var end = addDays(start, 4);
   return { start: dateText(start), end: dateText(end) };
 }
-function teamPeriodItems() {
+function monthBoundedWeekRange() {
   var range = weekRange();
+  var info = weekMonthInfo(selectedWeekStart);
+  return {
+    start: clampDateToMonth(range.start, info),
+    end: clampDateToMonth(range.end, info),
+    year: info.year,
+    month: info.month
+  };
+}
+function defaultWeeklyReportRange() {
+  var range = weekRange();
+  var info = weekMonthInfo(selectedWeekStart);
+  return {
+    start: range.start,
+    end: range.end,
+    year: info.year,
+    month: info.month
+  };
+}
+function setDefaultWeeklyReportRange() {
+  if (!weeklyReportStart || !weeklyReportEnd) return;
+  var range = defaultWeeklyReportRange();
+  setLeaveDateInput(weeklyReportStart, range.start);
+  setLeaveDateInput(weeklyReportEnd, range.end);
+  updateWeeklyReportPreview();
+}
+function weeklyReportRange() {
+  var defaults = defaultWeeklyReportRange();
+  var start = leaveDateValue(weeklyReportStart) || defaults.start;
+  var end = leaveDateValue(weeklyReportEnd) || defaults.end;
+  if (end < start) {
+    var temp = start;
+    start = end;
+    end = temp;
+  }
+  return { start: start, end: end, year: defaults.year, month: defaults.month };
+}
+function teamPeriodItems() {
+  var range = monthBoundedWeekRange();
   return reports.filter(function(item) {
     if (ownerNames.indexOf(item.owner) < 0) return false;
     if (selectedTeamPeriod === "week") {
-      return item.date >= range.start && item.date <= range.end;
+      return item.date >= range.start &&
+        item.date <= range.end &&
+        isWeekdayDate(parseDateText(item.date));
     }
     return item.date === selectedTeamDate;
   });
+}
+function dateRangeItems(range) {
+  return reports.filter(function(item) {
+    return ownerNames.indexOf(item.owner) >= 0 &&
+      item.date >= range.start &&
+      item.date <= range.end &&
+      isWeekdayDate(parseDateText(item.date));
+  });
+}
+function koreanMonthDay(value, includeMonth) {
+  var d = parseDateText(value);
+  return (includeMonth ? (d.getMonth() + 1) + "월 " : "") + d.getDate() + "일";
+}
+function weekNumbersText(start, end) {
+  var numbers = [];
+  for (var cursor = parseDateText(start); cursor <= parseDateText(end); cursor = addDays(cursor, 1)) {
+    var number = weekNumberOfDate(dateText(cursor));
+    if (numbers.indexOf(number) < 0) numbers.push(number);
+  }
+  return numbers.join(", ") + "주차";
+}
+function percentText(amount, target) {
+  var value = target ? Number(amount || 0) / target * 100 : 0;
+  var rounded = Math.round(value * 10) / 10;
+  return (Math.abs(rounded - Math.round(rounded)) < 0.05 ? String(Math.round(rounded)) : rounded.toFixed(1)) + "%";
+}
+function reportWonMan(value) {
+  return money.format(Math.round(Number(value || 0) / 10000)) + "만원";
+}
+function weeklyReportText() {
+  var range = weeklyReportRange();
+  var items = dateRangeItems(range);
+  var summary = summarize(items);
+  var targetAmount = ownerCount() * 2000000;
+  var startDate = parseDateText(range.start);
+  var endDate = parseDateText(range.end);
+  var endIncludesMonth = startDate.getFullYear() !== endDate.getFullYear() || startDate.getMonth() !== endDate.getMonth();
+  var ownerLines = groupByOwner(items)
+    .sort(function(a, b) {
+      var amountDiff = b.summary.total.amount - a.summary.total.amount;
+      if (amountDiff !== 0) return amountDiff;
+      return ownerNames.indexOf(a.owner) - ownerNames.indexOf(b.owner);
+    })
+    .map(function(group) {
+      return group.owner + " " + reportWonMan(group.summary.total.amount) + " / " +
+        percentText(group.summary.total.amount, 2000000) + "\n" +
+        "(신규 " + group.summary.new.count + " / 증대 " + group.summary.growth.count + ")";
+    });
+
+  return [
+    "< 수도권팀 주간보고 >",
+    "*" + koreanMonthDay(range.start, true) + " ~ " + koreanMonthDay(range.end, endIncludesMonth) + " (" + weekNumbersText(range.start, range.end) + ")",
+    "",
+    "---------------------------",
+    "MR 수도권팀",
+    "",
+    "주간 누적 신규 " + summary.new.count + "건 / 증대 " + summary.growth.count + "건",
+    "누적 매출합 " + reportWonMan(summary.total.amount),
+    "",
+    "---------------------------",
+    String(range.month).padStart(2, "0") + "월 누적 매출",
+    "",
+    "팀 목표 : " + reportWonMan(targetAmount),
+    "누적매출 : " + reportWonMan(summary.total.amount) + " / " + percentText(summary.total.amount, targetAmount),
+    "",
+    "담당자별 실적",
+    ownerLines.join("\n\n")
+  ].join("\n");
+}
+function updateWeeklyReportPreview() {
+  if (!weeklyReportPreview) return;
+  weeklyReportPreview.textContent = weeklyReportText();
+}
+function openWeeklyReportPanel() {
+  if (!weeklyReportPanel) return;
+  if (!weeklyReportPanel.classList.contains("active")) {
+    setDefaultWeeklyReportRange();
+    if (weeklyReportRangeBox) weeklyReportRangeBox.classList.remove("active");
+    if (weeklyDateToggleBtn) weeklyDateToggleBtn.textContent = "날짜 설정";
+  }
+  weeklyReportPanel.classList.add("active");
+  weeklyReportPanel.setAttribute("aria-hidden", "false");
+  updateWeeklyReportPreview();
+}
+function closeWeeklyReportPanel() {
+  if (weeklyReportPanel) weeklyReportPanel.classList.remove("active");
+  if (weeklyReportPanel) weeklyReportPanel.setAttribute("aria-hidden", "true");
+  if (weeklyReportRangeBox) weeklyReportRangeBox.classList.remove("active");
+  if (weeklyDateToggleBtn) weeklyDateToggleBtn.textContent = "날짜 설정";
+}
+function toggleWeeklyDateSettings() {
+  if (!weeklyReportRangeBox) return;
+  var open = !weeklyReportRangeBox.classList.contains("active");
+  weeklyReportRangeBox.classList.toggle("active", open);
+  if (weeklyDateToggleBtn) weeklyDateToggleBtn.textContent = open ? "날짜 설정 닫기" : "날짜 설정";
+}
+async function copyWeeklyReportText() {
+  var text = weeklyReportText();
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    await navigator.clipboard.writeText(text);
+  } else {
+    var textarea = document.createElement("textarea");
+    textarea.value = text;
+    textarea.setAttribute("readonly", "");
+    textarea.style.position = "fixed";
+    textarea.style.left = "-9999px";
+    document.body.appendChild(textarea);
+    textarea.select();
+    document.execCommand("copy");
+    document.body.removeChild(textarea);
+  }
+  showNotice("카톡 보고 문구를 복사했습니다.");
 }
 function completedOwnerSet() {
   var map = {};
@@ -1301,10 +1527,14 @@ function drawRoundedBox(ctx, x, y, w, h, color, stroke) {
 }
 function makeTeamScreenshot(period) {
   var isWeek = period === "week";
-  var range = weekRange();
+  var range = monthBoundedWeekRange();
   var items = reports.filter(function(item) {
     if (ownerNames.indexOf(item.owner) < 0) return false;
-    if (isWeek) return item.date >= range.start && item.date <= range.end;
+    if (isWeek) {
+      return item.date >= range.start &&
+        item.date <= range.end &&
+        isWeekdayDate(parseDateText(item.date));
+    }
     return item.date === selectedTeamDate;
   });
   var summary = summarize(items);
@@ -1413,6 +1643,9 @@ function render() {
     todayEmpty.style.display = teamItems.length ? "none" : "block";
   }
   renderTeamCards(teamItems);
+  if (weeklyReportPanel && weeklyReportPanel.classList.contains("active")) {
+    updateWeeklyReportPreview();
+  }
 }
 function resetAfterSave() {
   editingId = "";
@@ -1525,6 +1758,39 @@ if (dayScreenshotBtn) {
 if (weekScreenshotBtn) {
   weekScreenshotBtn.addEventListener("click", downloadWeekScreenshot);
 }
+if (copyWeeklyReportBtn) {
+  copyWeeklyReportBtn.addEventListener("click", function() {
+    openWeeklyReportPanel();
+  });
+}
+if (weeklyDateToggleBtn) {
+  weeklyDateToggleBtn.addEventListener("click", toggleWeeklyDateSettings);
+}
+if (weeklyReportStart) {
+  weeklyReportStart.addEventListener("click", function() {
+    openCalendar("weeklyStart", leaveDateValue(weeklyReportStart) || selectedWeekStart);
+  });
+}
+if (weeklyReportEnd) {
+  weeklyReportEnd.addEventListener("click", function() {
+    openCalendar("weeklyEnd", leaveDateValue(weeklyReportEnd) || dateText(addDays(parseDateText(selectedWeekStart), 4)));
+  });
+}
+if (closeWeeklyReportBtn) {
+  closeWeeklyReportBtn.addEventListener("click", closeWeeklyReportPanel);
+}
+if (weeklyReportPanel) {
+  weeklyReportPanel.addEventListener("click", function(e) {
+    if (e.target === weeklyReportPanel) closeWeeklyReportPanel();
+  });
+}
+if (confirmCopyWeeklyReportBtn) {
+  confirmCopyWeeklyReportBtn.addEventListener("click", function() {
+    copyWeeklyReportText().catch(function(error) {
+      showNotice("카톡 보고 복사 실패: " + error.message, "danger");
+    });
+  });
+}
 ownerInput.addEventListener("change", function() {
   var owner = ownerInput.value.trim();
   if (ownerNames.indexOf(owner) >= 0) {
@@ -1576,6 +1842,7 @@ document.querySelectorAll("[data-period]").forEach(function(button) {
     if (selectedTeamPeriod === "day") {
       loadCompletionsForSelectedDate();
     } else {
+      setDefaultWeeklyReportRange();
       render();
     }
   });
@@ -1605,6 +1872,7 @@ document.getElementById("nextDayBtn").addEventListener("click", function() {
 if (teamWeekPicker) {
   teamWeekPicker.addEventListener("change", function() {
     selectedWeekStart = dateText(startOfWeekDate(parseDateText(teamWeekPicker.value || todayText)));
+    setDefaultWeeklyReportRange();
     openedTeamOwner = "";
     render();
   });
@@ -1626,6 +1894,11 @@ if (calendarNextBtn) {
     renderCalendar();
   });
 }
+if (calendarTodayBtn) {
+  calendarTodayBtn.addEventListener("click", function() {
+    applyCalendarDate(todayText);
+  });
+}
 if (calendarCloseBtn) {
   calendarCloseBtn.addEventListener("click", closeCalendar);
 }
@@ -1636,11 +1909,13 @@ if (calendarOverlay) {
 }
 document.getElementById("prevWeekBtn").addEventListener("click", function() {
   selectedWeekStart = dateText(addDays(parseDateText(selectedWeekStart), -7));
+  setDefaultWeeklyReportRange();
   openedTeamOwner = "";
   render();
 });
 document.getElementById("nextWeekBtn").addEventListener("click", function() {
   selectedWeekStart = dateText(addDays(parseDateText(selectedWeekStart), 7));
+  setDefaultWeeklyReportRange();
   openedTeamOwner = "";
   render();
 });
@@ -1722,6 +1997,7 @@ form.addEventListener("submit", async function(e) {
 });
 
 syncMonthPicker();
+setDefaultWeeklyReportRange();
 updateAmountPreview();
 loadData().catch(function(error) {
   status("연결 실패: " + error.message, "error");

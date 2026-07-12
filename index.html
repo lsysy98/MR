@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Cache-Control" content="no-store">
   <title>MR수도권팀 일일보고</title>
   <style>
     * { box-sizing: border-box; }
@@ -58,7 +59,7 @@
     .notice-overlay {
       position: fixed;
       inset: 0;
-      z-index: 50;
+      z-index: 80;
       display: none;
       align-items: center;
       justify-content: center;
@@ -90,7 +91,7 @@
     .leave-overlay {
       position: fixed;
       inset: 0;
-      z-index: 49;
+      z-index: 50;
       display: none;
       align-items: center;
       justify-content: center;
@@ -147,7 +148,7 @@
     .calendar-overlay {
       position: fixed;
       inset: 0;
-      z-index: 60;
+      z-index: 100;
       display: none;
       align-items: center;
       justify-content: center;
@@ -169,6 +170,7 @@
     .calendar-head strong { text-align: center; font-size: 16px; }
     .calendar-weekdays, .calendar-days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
     .calendar-weekdays span { color: var(--muted); font-size: 12px; font-weight: 900; text-align: center; }
+    .calendar-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
     .calendar-day {
       min-height: 38px;
       border: 1px solid var(--line);
@@ -257,6 +259,59 @@
     .period-switch { grid-template-columns: 1fr 1fr; }
     .period-controls { display: grid; gap: 8px; }
     .day-control, .week-control { display: grid; grid-template-columns: .8fr minmax(150px, 1.4fr) .8fr; gap: 8px; align-items: center; }
+    .weekly-report-tools {
+      display: none;
+      grid-template-columns: 1fr;
+      gap: 8px;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fbfdfc;
+    }
+    .weekly-report-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 50;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 18px;
+      background: rgba(23, 33, 28, .28);
+    }
+    .weekly-report-overlay.active { display: flex; }
+    .weekly-report-box {
+      width: min(520px, 100%);
+      display: grid;
+      gap: 10px;
+      padding: 18px;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: 0 18px 44px rgba(27,45,37,.22);
+    }
+    .weekly-report-box h3 { margin: 0; font-size: 17px; }
+    .weekly-report-box p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.45; }
+    .weekly-report-range { display: none; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .weekly-report-range.active { display: grid; }
+    .weekly-report-range label { gap: 5px; font-size: 12px; }
+    .weekly-report-range input { min-height: 40px; }
+    .weekly-report-preview {
+      margin: 0;
+      max-height: 280px;
+      overflow: auto;
+      white-space: pre-wrap;
+      word-break: keep-all;
+      line-height: 1.55;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      color: var(--text);
+      font-family: "Malgun Gothic", system-ui, sans-serif;
+      font-size: 13px;
+    }
+    .weekly-report-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    #copyWeeklyReportBtn, #confirmCopyWeeklyReportBtn { min-height: 40px; white-space: nowrap; }
     .date-pick-wrap { position: relative; }
     .date-label, .week-label {
       width: 100%;
@@ -438,6 +493,7 @@
       .team-line .team-count { font-size: 11px; }
       .team-line .team-amount { font-size: 13px; }
       .day-control, .week-control { grid-template-columns: .68fr minmax(154px, 1.64fr) .68fr; gap: 6px; }
+      .weekly-report-tools { grid-template-columns: 1fr; }
       .date-label, .week-label { min-height: 40px; padding: 0 6px; font-size: 12px; font-weight: 700; letter-spacing: 0; }
       .completion-actions { display: grid; grid-template-columns: 1fr 1fr; }
       .completion-actions .btn { padding: 0 8px; }
@@ -540,7 +596,7 @@
       <section>
         <div class="head"><h2>담당자별 현황</h2></div>
         <div class="body">
-          <div class="status" id="statusBox">연결 확인 중입니다.</div>
+          <div class="status" id="statusBox">보고 데이터를 불러오는 중입니다.</div>
           <div class="month-nav">
             <div class="month-main">
               <input id="monthPicker" type="month" aria-label="월 선택">
@@ -599,6 +655,9 @@
           </div>
           <div class="owner-grid" id="todayOwnerCards"></div>
           <div class="empty" id="todayEmpty">오늘 입력된 보고가 없습니다.</div>
+          <div class="weekly-report-tools" id="weeklyReportTools">
+            <button class="btn primary" type="button" id="copyWeeklyReportBtn">카톡 문구 복사</button>
+          </div>
           <div class="completion-panel" id="completionPanel">
             <div class="completion-summary" id="completionSummary">
               <strong id="completionCount">완료 0/7</strong>
@@ -621,6 +680,22 @@
     <span>made by 이승엽</span>
     <span>문의 <a href="mailto:homerun@osstem.com">homerun@osstem.com</a></span>
   </footer>
+  <div class="weekly-report-overlay" id="weeklyReportPanel" aria-hidden="true">
+    <div class="weekly-report-box" role="dialog" aria-modal="true" aria-labelledby="weeklyReportTitle">
+      <h3 id="weeklyReportTitle">카톡 보고 문구</h3>
+      <p>아래 문구를 확인한 뒤 복사해서 카톡에 붙여넣으면 됩니다.</p>
+      <button class="btn" type="button" id="weeklyDateToggleBtn">날짜 설정</button>
+      <div class="weekly-report-range" id="weeklyReportRange">
+        <label>보고 시작일<span class="date-input-wrap"><input id="weeklyReportStart" type="text" readonly></span></label>
+        <label>보고 종료일<span class="date-input-wrap"><input id="weeklyReportEnd" type="text" readonly></span></label>
+      </div>
+      <pre class="weekly-report-preview" id="weeklyReportPreview"></pre>
+      <div class="weekly-report-actions">
+        <button class="btn" type="button" id="closeWeeklyReportBtn">닫기</button>
+        <button class="btn primary" type="button" id="confirmCopyWeeklyReportBtn">문구 복사하기</button>
+      </div>
+    </div>
+  </div>
   <div class="leave-overlay" id="leaveOverlay" aria-hidden="true">
     <div class="leave-box" role="dialog" aria-modal="true" aria-labelledby="leaveTitle">
       <h3 id="leaveTitle">연차 설정</h3>
@@ -652,7 +727,10 @@
         <span>일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span>
       </div>
       <div class="calendar-days" id="calendarDays"></div>
-      <button class="btn" type="button" id="calendarCloseBtn">닫기</button>
+      <div class="calendar-actions">
+        <button class="btn primary" type="button" id="calendarTodayBtn">오늘</button>
+        <button class="btn" type="button" id="calendarCloseBtn">닫기</button>
+      </div>
     </div>
   </div>
   <div class="notice-overlay" id="noticeOverlay" aria-hidden="true">
@@ -664,6 +742,6 @@
       </div>
     </div>
   </div>
-  <script src="app.js"></script>
+  <script src="app.js?v=20260713-0506"></script>
 </body>
 </html>

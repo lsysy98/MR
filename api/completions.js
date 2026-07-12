@@ -26,16 +26,29 @@ async function supabase(path, options = {}) {
     throw new Error("SUPABASE_URL must look like https://xxxx.supabase.co");
   }
 
-  const response = await fetch(`${baseUrl}/rest/v1/${path}`, {
-    ...options,
-    headers: {
-      apikey: SUPABASE_SERVICE_ROLE_KEY,
-      Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-      "Content-Type": "application/json",
-      Prefer: "return=representation",
-      ...(options.headers || {})
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 12000);
+  let response;
+  try {
+    response = await fetch(`${baseUrl}/rest/v1/${path}`, {
+      ...options,
+      signal: controller.signal,
+      headers: {
+        apikey: SUPABASE_SERVICE_ROLE_KEY,
+        Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        "Content-Type": "application/json",
+        Prefer: "return=representation",
+        ...(options.headers || {})
+      }
+    });
+  } catch (error) {
+    if (error.name === "AbortError") {
+      throw new Error("Supabase response timed out.");
     }
-  });
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
 
   const text = await response.text();
   const data = text ? JSON.parse(text) : null;
