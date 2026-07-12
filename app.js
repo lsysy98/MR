@@ -87,7 +87,7 @@ var editingLeaveRangeDates = [];
 var calendarMode = "day";
 var calendarMonthDate = new Date(today.getFullYear(), today.getMonth(), 1);
 
-dateInput.value = todayText;
+setLeaveDateInput(dateInput, todayText);
 if (teamDatePicker) teamDatePicker.value = selectedTeamDate;
 if (teamWeekPicker) teamWeekPicker.value = selectedWeekStart;
 var savedOwnerName = localStorage.getItem("ownerName") || "";
@@ -181,6 +181,21 @@ function isFridayDate(value) {
 function isWeekdayDate(d) {
   var day = d.getDay();
   return day >= 1 && day <= 5;
+}
+function isWeekendDateText(value) {
+  return !isWeekdayDate(parseDateText(value));
+}
+function weekendBlockMessage() {
+  return calendarMode === "formDate"
+    ? "선택한 날짜는 주말이라 못 올립니다."
+    : "토, 일요일은 조회할 수 없습니다.";
+}
+function nextWeekdayText(value, delta) {
+  var cursor = parseDateText(value);
+  do {
+    cursor = addDays(cursor, delta);
+  } while (!isWeekdayDate(cursor));
+  return dateText(cursor);
 }
 function isKoreanHolidayDateText(value) {
   return Boolean(koreaHolidays[value]);
@@ -380,6 +395,7 @@ function openCalendar(mode, value) {
   }
 }
 function selectedCalendarDateText() {
+  if (calendarMode === "formDate") return leaveDateValue(dateInput) || todayText;
   if (calendarMode === "leaveStart") return leaveDateValue(leaveStartDate) || selectedTeamDate;
   if (calendarMode === "leaveEnd") return leaveDateValue(leaveEndDate) || selectedTeamDate;
   if (calendarMode === "weeklyStart") return leaveDateValue(weeklyReportStart) || selectedTeamDate;
@@ -387,7 +403,14 @@ function selectedCalendarDateText() {
   return calendarMode === "week" ? selectedWeekStart : selectedTeamDate;
 }
 function applyCalendarDate(selectedKey) {
-  if (calendarMode === "leaveStart") {
+  if (["formDate", "day", "week", "weeklyStart", "weeklyEnd"].indexOf(calendarMode) >= 0 && isWeekendDateText(selectedKey)) {
+    showNotice(weekendBlockMessage(), "danger");
+    return;
+  }
+  if (calendarMode === "formDate") {
+    setLeaveDateInput(dateInput, selectedKey);
+    closeCalendar();
+  } else if (calendarMode === "leaveStart") {
     setLeaveDateInput(leaveStartDate, selectedKey);
     if (leaveEndDate && (!leaveDateValue(leaveEndDate) || leaveDateValue(leaveEndDate) < selectedKey)) {
       setLeaveDateInput(leaveEndDate, selectedKey);
@@ -1666,7 +1689,7 @@ function resetFormAll() {
   if (branchInput) branchInput.value = "";
   productInput.value = "클로르";
   amountInput.value = "";
-  dateInput.value = todayText;
+  setLeaveDateInput(dateInput, todayText);
   selectedType = "신규";
   setDefaultCollectionMonth();
   updateTypeButtons();
@@ -1676,7 +1699,7 @@ function resetFormAll() {
 function startEdit(item) {
   editingId = item.id;
   ownerInput.value = item.owner;
-  dateInput.value = item.date;
+  setLeaveDateInput(dateInput, item.date);
   clientInput.value = item.client;
   if (branchInput) branchInput.value = item.branchName || "";
   productInput.value = item.product;
@@ -1750,6 +1773,11 @@ if (leaveStartDate) {
 if (leaveEndDate) {
   leaveEndDate.addEventListener("click", function() {
     openCalendar("leaveEnd", leaveDateValue(leaveEndDate) || selectedTeamDate);
+  });
+}
+if (dateInput) {
+  dateInput.addEventListener("click", function() {
+    openCalendar("formDate", leaveDateValue(dateInput) || todayText);
   });
 }
 if (dayScreenshotBtn) {
@@ -1860,12 +1888,12 @@ if (teamDateLabel) {
   });
 }
 document.getElementById("prevDayBtn").addEventListener("click", function() {
-  selectedTeamDate = dateText(addDays(parseDateText(selectedTeamDate), -1));
+  selectedTeamDate = nextWeekdayText(selectedTeamDate, -1);
   openedTeamOwner = "";
   loadCompletionsForSelectedDate();
 });
 document.getElementById("nextDayBtn").addEventListener("click", function() {
-  selectedTeamDate = dateText(addDays(parseDateText(selectedTeamDate), 1));
+  selectedTeamDate = nextWeekdayText(selectedTeamDate, 1);
   openedTeamOwner = "";
   loadCompletionsForSelectedDate();
 });
@@ -1953,12 +1981,22 @@ form.addEventListener("submit", async function(e) {
 
   localStorage.setItem("ownerName", owner);
 
+  var reportDate = leaveDateValue(dateInput);
+  if (!reportDate) {
+    showNotice("날짜를 선택해주세요.", "danger");
+    return;
+  }
+  if (isWeekendDateText(reportDate)) {
+    showNotice("선택한 날짜는 주말이라 못 올립니다.", "danger");
+    return;
+  }
+
   var old = reports.find(function(report) { return report.id === editingId; }) || {};
   var item = {
     id: editingId || makeId(),
     createdAt: old.createdAt || Date.now(),
     updatedAt: Date.now(),
-    date: dateInput.value,
+    date: reportDate,
     owner: owner,
     client: clientInput.value.trim(),
     branchName: branchInput ? branchInput.value.trim() : "",
