@@ -15,6 +15,8 @@ var selectedType = "신규";
 var selectedTeamPeriod = "day";
 var selectedTeamDate = todayText;
 var selectedWeekStart = dateText(startOfWeekDate(today));
+var selectedWeekYear = today.getFullYear();
+var selectedWeekMonth = today.getMonth() + 1;
 var openedOwner = "";
 var openedTeamOwner = "";
 var ownerFilters = {};
@@ -142,15 +144,35 @@ function startOfWeekDate(d) {
   var dayOffset = (d.getDay() + 6) % 7;
   return addDays(d, -dayOffset);
 }
+function setSelectedWeekByDate(value) {
+  var date = parseDateText(value || todayText);
+  selectedWeekStart = dateText(startOfWeekDate(date));
+  selectedWeekYear = date.getFullYear();
+  selectedWeekMonth = date.getMonth() + 1;
+  if (teamWeekPicker) teamWeekPicker.value = dateText(date);
+}
+function selectedWeekAnchorText() {
+  return monthBoundedWeekRange().start;
+}
 function weekLabelFromStart(startText) {
-  var base = addDays(parseDateText(startText), 3);
-  var first = new Date(base.getFullYear(), base.getMonth(), 1);
+  var info = weekMonthInfo(startText);
+  var first = new Date(info.year, info.month - 1, 1);
+  var firstWeekStart = startOfWeekDate(first);
+  var weekStart = parseDateText(startText || selectedWeekStart);
+  var weekNo = Math.floor((weekStart - firstWeekStart) / (7 * 24 * 60 * 60 * 1000)) + 1;
+  return info.month + "월 " + weekNo + "주차";
+}
+function weekNumberOfDateInMonth(value, info) {
+  var d = parseDateText(value);
+  var first = new Date(info.year, info.month - 1, 1);
   var firstOffset = (first.getDay() + 6) % 7;
-  var weekNo = Math.ceil((base.getDate() + firstOffset) / 7);
-  return (base.getMonth() + 1) + "월 " + weekNo + "주차";
+  return Math.ceil((d.getDate() + firstOffset) / 7);
 }
 function weekMonthInfo(startText) {
-  var base = addDays(parseDateText(startText || selectedWeekStart), 3);
+  if (!startText || startText === selectedWeekStart) {
+    return { year: selectedWeekYear, month: selectedWeekMonth };
+  }
+  var base = parseDateText(startText);
   return { year: base.getFullYear(), month: base.getMonth() + 1 };
 }
 function clampDateToMonth(value, info) {
@@ -196,6 +218,14 @@ function nextWeekdayText(value, delta) {
     cursor = addDays(cursor, delta);
   } while (!isWeekdayDate(cursor));
   return dateText(cursor);
+}
+function moveSelectedWeek(delta) {
+  var range = monthBoundedWeekRange();
+  var edge = delta > 0 ? range.end : range.start;
+  setSelectedWeekByDate(nextWeekdayText(edge, delta));
+  setDefaultWeeklyReportRange();
+  openedTeamOwner = "";
+  render();
 }
 function isKoreanHolidayDateText(value) {
   return Boolean(koreaHolidays[value]);
@@ -410,7 +440,7 @@ function selectedCalendarDateText() {
   if (calendarMode === "leaveEnd") return leaveDateValue(leaveEndDate) || selectedTeamDate;
   if (calendarMode === "weeklyStart") return leaveDateValue(weeklyReportStart) || selectedTeamDate;
   if (calendarMode === "weeklyEnd") return leaveDateValue(weeklyReportEnd) || selectedTeamDate;
-  return calendarMode === "week" ? selectedWeekStart : selectedTeamDate;
+  return calendarMode === "week" ? selectedWeekAnchorText() : selectedTeamDate;
 }
 function applyCalendarDate(selectedKey) {
   if (["formDate", "day", "week", "weeklyStart", "weeklyEnd"].indexOf(calendarMode) >= 0 && isWeekendDateText(selectedKey)) {
@@ -447,8 +477,7 @@ function applyCalendarDate(selectedKey) {
     updateWeeklyReportPreview();
     closeCalendar();
   } else if (calendarMode === "week") {
-    selectedWeekStart = dateText(startOfWeekDate(parseDateText(selectedKey)));
-    if (teamWeekPicker) teamWeekPicker.value = selectedWeekStart;
+    setSelectedWeekByDate(selectedKey);
     setDefaultWeeklyReportRange();
     openedTeamOwner = "";
     closeCalendar();
@@ -530,7 +559,7 @@ function syncTeamPeriodControls() {
     teamWeekLabel.textContent = weekLabelFromStart(selectedWeekStart);
   }
   if (teamWeekPicker) {
-    teamWeekPicker.value = selectedWeekStart;
+    teamWeekPicker.value = selectedWeekAnchorText();
   }
   if (weeklyReportTools) {
     weeklyReportTools.style.display = selectedTeamPeriod === "week" ? "grid" : "none";
@@ -769,10 +798,13 @@ function koreanMonthDay(value, includeMonth) {
 }
 function weekNumbersText(start, end) {
   var numbers = [];
+  var info = weekMonthInfo(selectedWeekStart);
   for (var cursor = parseDateText(start); cursor <= parseDateText(end); cursor = addDays(cursor, 1)) {
-    var number = weekNumberOfDate(dateText(cursor));
+    if (cursor.getFullYear() !== info.year || cursor.getMonth() + 1 !== info.month) continue;
+    var number = weekNumberOfDateInMonth(dateText(cursor), info);
     if (numbers.indexOf(number) < 0) numbers.push(number);
   }
+  if (!numbers.length) numbers.push(weekNumberOfDateInMonth(selectedWeekAnchorText(), info));
   return numbers.join(", ") + "주차";
 }
 function percentText(amount, target) {
@@ -1920,7 +1952,7 @@ document.getElementById("nextDayBtn").addEventListener("click", function() {
 });
 if (teamWeekPicker) {
   teamWeekPicker.addEventListener("change", function() {
-    selectedWeekStart = dateText(startOfWeekDate(parseDateText(teamWeekPicker.value || todayText)));
+    setSelectedWeekByDate(teamWeekPicker.value || todayText);
     setDefaultWeeklyReportRange();
     openedTeamOwner = "";
     render();
@@ -1928,7 +1960,7 @@ if (teamWeekPicker) {
 }
 if (teamWeekLabel) {
   teamWeekLabel.addEventListener("click", function() {
-    openCalendar("week", selectedWeekStart);
+    openCalendar("week", selectedWeekAnchorText());
   });
 }
 if (calendarPrevBtn) {
@@ -1957,16 +1989,10 @@ if (calendarOverlay) {
   });
 }
 document.getElementById("prevWeekBtn").addEventListener("click", function() {
-  selectedWeekStart = dateText(addDays(parseDateText(selectedWeekStart), -7));
-  setDefaultWeeklyReportRange();
-  openedTeamOwner = "";
-  render();
+  moveSelectedWeek(-1);
 });
 document.getElementById("nextWeekBtn").addEventListener("click", function() {
-  selectedWeekStart = dateText(addDays(parseDateText(selectedWeekStart), 7));
-  setDefaultWeeklyReportRange();
-  openedTeamOwner = "";
-  render();
+  moveSelectedWeek(1);
 });
 monthPicker.addEventListener("change", function() {
   if (!monthPicker.value) return;
