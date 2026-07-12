@@ -707,12 +707,13 @@ function monthBoundedWeekRange() {
   };
 }
 function defaultWeeklyReportRange() {
-  var range = monthBoundedWeekRange();
+  var range = weekRange();
+  var info = weekMonthInfo(selectedWeekStart);
   return {
-    start: firstBusinessDayOfMonth(range.year, range.month),
+    start: range.start,
     end: range.end,
-    year: range.year,
-    month: range.month
+    year: info.year,
+    month: info.month
   };
 }
 function setDefaultWeeklyReportRange() {
@@ -753,6 +754,15 @@ function dateRangeItems(range) {
       isWeekdayDate(parseDateText(item.date));
   });
 }
+function reportDateMonthItems(year, month) {
+  var start = dateText(new Date(year, month - 1, 1));
+  var end = dateText(new Date(year, month, 0));
+  return reports.filter(function(item) {
+    return ownerNames.indexOf(item.owner) >= 0 &&
+      item.date >= start &&
+      item.date <= end;
+  });
+}
 function koreanMonthDay(value, includeMonth) {
   var d = parseDateText(value);
   return (includeMonth ? (d.getMonth() + 1) + "월 " : "") + d.getDate() + "일";
@@ -775,13 +785,15 @@ function reportWonMan(value) {
 }
 function weeklyReportText() {
   var range = weeklyReportRange();
-  var items = dateRangeItems(range);
-  var summary = summarize(items);
+  var weekItems = dateRangeItems(range);
+  var weekSummary = summarize(weekItems);
+  var monthItems = reportDateMonthItems(range.year, range.month);
+  var monthSummary = summarize(monthItems);
   var targetAmount = ownerCount() * 2000000;
   var startDate = parseDateText(range.start);
   var endDate = parseDateText(range.end);
   var endIncludesMonth = startDate.getFullYear() !== endDate.getFullYear() || startDate.getMonth() !== endDate.getMonth();
-  var ownerLines = groupByOwner(items)
+  var ownerLines = groupByOwner(monthItems)
     .sort(function(a, b) {
       var amountDiff = b.summary.total.amount - a.summary.total.amount;
       if (amountDiff !== 0) return amountDiff;
@@ -800,14 +812,14 @@ function weeklyReportText() {
     "---------------------------",
     "MR 수도권팀",
     "",
-    "주간 누적 신규 " + summary.new.count + "건 / 증대 " + summary.growth.count + "건",
-    "누적 매출합 " + reportWonMan(summary.total.amount),
+    "주간 누적 신규 " + weekSummary.new.count + "건 / 증대 " + weekSummary.growth.count + "건",
+    "누적 매출합 " + reportWonMan(weekSummary.total.amount),
     "",
     "---------------------------",
     String(range.month).padStart(2, "0") + "월 누적 매출",
     "",
     "팀 목표 : " + reportWonMan(targetAmount),
-    "누적매출 : " + reportWonMan(summary.total.amount) + " / " + percentText(summary.total.amount, targetAmount),
+    "누적매출 : " + reportWonMan(monthSummary.total.amount) + " / " + percentText(monthSummary.total.amount, targetAmount),
     "",
     "담당자별 실적",
     ownerLines.join("\n\n")
