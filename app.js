@@ -200,6 +200,16 @@ function nextWeekdayText(value, delta) {
 function isKoreanHolidayDateText(value) {
   return Boolean(koreaHolidays[value]);
 }
+function isBusinessDate(d) {
+  return isWeekdayDate(d) && !isKoreanHolidayDateText(dateText(d));
+}
+function firstBusinessDayOfMonth(year, month) {
+  var cursor = new Date(year, month - 1, 1);
+  while (!isBusinessDate(cursor)) {
+    cursor = addDays(cursor, 1);
+  }
+  return dateText(cursor);
+}
 function remainingWeekdaysAfter(value) {
   var d = parseDateText(value);
   var days = [];
@@ -697,13 +707,12 @@ function monthBoundedWeekRange() {
   };
 }
 function defaultWeeklyReportRange() {
-  var range = weekRange();
-  var info = weekMonthInfo(selectedWeekStart);
+  var range = monthBoundedWeekRange();
   return {
-    start: range.start,
+    start: firstBusinessDayOfMonth(range.year, range.month),
     end: range.end,
-    year: info.year,
-    month: info.month
+    year: range.year,
+    month: range.month
   };
 }
 function setDefaultWeeklyReportRange() {
