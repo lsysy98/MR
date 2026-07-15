@@ -61,4 +61,19 @@ on public.daily_completions (report_date, owner);
 create index if not exists daily_completions_report_date_idx
 on public.daily_completions (report_date);
 
+create table if not exists public.team_calendar_days (
+  id text primary key,
+  calendar_date date not null unique,
+  status text not null check (status in ('holiday', 'workday')),
+  label text,
+  created_at bigint not null,
+  updated_at bigint not null
+);
+
+create unique index if not exists team_calendar_days_date_uidx
+on public.team_calendar_days (calendar_date);
+
+create index if not exists team_calendar_days_status_idx
+on public.team_calendar_days (status);
+
 select pg_notify('pgrst', 'reload schema');

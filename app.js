@@ -10,6 +10,9 @@ var collectionYear = defaultCollection.year;
 var collectionMonth = defaultCollection.month;
 var reports = [];
 var dailyCompletions = [];
+var calendarDays = [];
+var calendarLoadError = "";
+var adminKey = "";
 var completionLoadError = "";
 var selectedType = "신규";
 var selectedTeamPeriod = "day";
@@ -24,6 +27,7 @@ var editingId = "";
 var ownerNames = ["성진욱", "김무영", "이승엽", "김태홍", "제성규", "송진영", "이현욱"];
 
 var form = document.getElementById("reportForm");
+var appTitle = document.getElementById("appTitle");
 var ownerInput = document.getElementById("owner");
 var dateInput = document.getElementById("date");
 var clientInput = document.getElementById("client");
@@ -69,6 +73,13 @@ var leaveEndDate = document.getElementById("leaveEndDate");
 var leaveList = document.getElementById("leaveList");
 var leaveSaveBtn = document.getElementById("leaveSaveBtn");
 var leaveCloseBtn = document.getElementById("leaveCloseBtn");
+var holidayOverlay = document.getElementById("holidayOverlay");
+var holidayDateInput = document.getElementById("holidayDate");
+var holidayStatusInput = document.getElementById("holidayStatus");
+var holidayLabelInput = document.getElementById("holidayLabel");
+var holidayList = document.getElementById("holidayList");
+var holidaySaveBtn = document.getElementById("holidaySaveBtn");
+var holidayCloseBtn = document.getElementById("holidayCloseBtn");
 var calendarOverlay = document.getElementById("calendarOverlay");
 var calendarTitle = document.getElementById("calendarTitle");
 var calendarDays = document.getElementById("calendarDays");
@@ -104,6 +115,7 @@ var koreaHolidays = {
   "2026-05-05": true,
   "2026-05-25": true,
   "2026-06-03": true,
+  "2026-07-17": true,
   "2026-08-17": true,
   "2026-09-24": true,
   "2026-09-25": true,
@@ -207,16 +219,38 @@ function isWeekdayDate(d) {
 function isWeekendDateText(value) {
   return !isWeekdayDate(parseDateText(value));
 }
-function weekendBlockMessage() {
+function calendarDayOverride(value) {
+  return calendarDays.find(function(day) {
+    return day.date === value;
+  }) || null;
+}
+function isManualWorkdayDateText(value) {
+  var override = calendarDayOverride(value);
+  return Boolean(override && override.status === "workday");
+}
+function isManualHolidayDateText(value) {
+  var override = calendarDayOverride(value);
+  return Boolean(override && override.status === "holiday");
+}
+function isKoreanHolidayDateText(value) {
+  return Boolean(koreaHolidays[value]);
+}
+function isNonWorkingDateText(value) {
+  if (isManualWorkdayDateText(value)) return false;
+  if (isManualHolidayDateText(value)) return true;
+  if (isKoreanHolidayDateText(value)) return true;
+  return isWeekendDateText(value);
+}
+function nonWorkingBlockMessage() {
   return calendarMode === "formDate"
-    ? "주말에는 거래처 입력이 불가능합니다. 다른 날짜를 선택해주세요."
-    : "주말에는 일일현황을 조회할 수 없습니다. 다른 날짜를 선택해주세요.";
+    ? "휴일에는 거래처 입력이 불가능합니다. 다른 날짜를 선택해주세요."
+    : "휴일에는 일일현황을 조회할 수 없습니다. 다른 날짜를 선택해주세요.";
 }
 function nextWeekdayText(value, delta) {
   var cursor = parseDateText(value);
   do {
     cursor = addDays(cursor, delta);
-  } while (!isWeekdayDate(cursor));
+  } while (isNonWorkingDateText(dateText(cursor)));
   return dateText(cursor);
 }
 function moveSelectedWeek(delta) {
@@ -227,11 +261,8 @@ function moveSelectedWeek(delta) {
   openedTeamOwner = "";
   render();
 }
-function isKoreanHolidayDateText(value) {
-  return Boolean(koreaHolidays[value]);
-}
 function isBusinessDate(d) {
-  return isWeekdayDate(d) && !isKoreanHolidayDateText(dateText(d));
+  return !isNonWorkingDateText(dateText(d));
 }
 function firstBusinessDayOfMonth(year, month) {
   var cursor = new Date(year, month - 1, 1);
@@ -251,7 +282,7 @@ function remainingWeekdaysAfter(value) {
 function shouldCaptureWeeklyForDate(value) {
   if (isFridayDate(value)) return true;
   var rest = remainingWeekdaysAfter(value);
-  return rest.length > 0 && rest.every(isKoreanHolidayDateText);
+  return rest.length > 0 && rest.every(isNonWorkingDateText);
 }
 function weeklyCaptureMessage(value) {
   if (isFridayDate(value)) return "금요일이니 주간 보고를 캡쳐합니다.";
@@ -440,15 +471,19 @@ function selectedCalendarDateText() {
   if (calendarMode === "leaveEnd") return leaveDateValue(leaveEndDate) || selectedTeamDate;
   if (calendarMode === "weeklyStart") return leaveDateValue(weeklyReportStart) || selectedTeamDate;
   if (calendarMode === "weeklyEnd") return leaveDateValue(weeklyReportEnd) || selectedTeamDate;
+  if (calendarMode === "holidayDate") return leaveDateValue(holidayDateInput) || todayText;
   return calendarMode === "week" ? selectedWeekAnchorText() : selectedTeamDate;
 }
 function applyCalendarDate(selectedKey) {
-  if (["formDate", "day", "week", "weeklyStart", "weeklyEnd"].indexOf(calendarMode) >= 0 && isWeekendDateText(selectedKey)) {
-    showNotice(weekendBlockMessage(), "danger");
+  if (["formDate", "day", "weeklyStart", "weeklyEnd"].indexOf(calendarMode) >= 0 && isNonWorkingDateText(selectedKey)) {
+    showNotice(nonWorkingBlockMessage(), "danger");
     return;
   }
   if (calendarMode === "formDate") {
     setLeaveDateInput(dateInput, selectedKey);
+    closeCalendar();
+  } else if (calendarMode === "holidayDate") {
+    setLeaveDateInput(holidayDateInput, selectedKey);
     closeCalendar();
   } else if (calendarMode === "leaveStart") {
     setLeaveDateInput(leaveStartDate, selectedKey);
@@ -513,8 +548,14 @@ function renderCalendar() {
     btn.type = "button";
     btn.className = "calendar-day";
     btn.textContent = String(day);
-    if (!isWeekdayDate(d)) btn.classList.add("weekend");
-    if (isKoreanHolidayDateText(key)) btn.classList.add("holiday");
+    var override = calendarDayOverride(key);
+    if (override && override.label) btn.title = override.label;
+    if (isManualWorkdayDateText(key)) {
+      btn.classList.add("workday");
+    } else {
+      if (!isWeekdayDate(d)) btn.classList.add("weekend");
+      if (isKoreanHolidayDateText(key) || isManualHolidayDateText(key)) btn.classList.add("holiday");
+    }
     if (key === todayText) btn.classList.add("today");
     if (key === selectedCalendarDateText()) btn.classList.add("selected");
     btn.addEventListener("click", function(selectedKey) {
@@ -622,6 +663,21 @@ async function completionApi(method, body, query) {
   if (body) options.body = JSON.stringify(body);
   return requestJson("/api/completions" + (query || ""), options, 8000);
 }
+async function holidayApi(method, body, query) {
+  var options = { method: method, headers: { "Content-Type": "application/json" } };
+  if (body) options.body = JSON.stringify(body);
+  return requestJson("/api/holidays" + (query || ""), options, 8000);
+}
+async function loadCalendarDays(skipRender) {
+  try {
+    calendarDays = await holidayApi("GET");
+    calendarLoadError = "";
+  } catch (error) {
+    calendarDays = [];
+    calendarLoadError = error.message;
+  }
+  if (!skipRender) render();
+}
 async function loadCompletionsForSelectedDate(skipRender) {
   try {
     dailyCompletions = await completionApi("GET", null, "?date=" + encodeURIComponent(selectedTeamDate));
@@ -634,6 +690,7 @@ async function loadCompletionsForSelectedDate(skipRender) {
 }
 async function loadData() {
   status("보고 데이터를 불러오는 중입니다.", "");
+  await loadCalendarDays(true);
   reports = await api("GET");
   status("", "");
   render();
@@ -770,7 +827,7 @@ function teamPeriodItems() {
     if (selectedTeamPeriod === "week") {
       return item.date >= range.start &&
         item.date <= range.end &&
-        isWeekdayDate(parseDateText(item.date));
+        isBusinessDate(parseDateText(item.date));
     }
     return item.date === selectedTeamDate;
   });
@@ -780,7 +837,7 @@ function dateRangeItems(range) {
     return ownerNames.indexOf(item.owner) >= 0 &&
       item.date >= range.start &&
       item.date <= range.end &&
-      isWeekdayDate(parseDateText(item.date));
+      isBusinessDate(parseDateText(item.date));
   });
 }
 function reportDateMonthItems(year, month) {
@@ -1274,6 +1331,140 @@ async function deleteLeaveDates(dates) {
   render();
   showNotice("연차를 삭제했습니다.");
 }
+function calendarStatusText(statusValue) {
+  return statusValue === "workday" ? "근무일" : "휴일";
+}
+function renderHolidayList(message) {
+  if (!holidayList) return;
+  holidayList.textContent = "";
+
+  if (message) {
+    var loading = document.createElement("div");
+    loading.className = "holiday-empty";
+    loading.textContent = message;
+    holidayList.appendChild(loading);
+    return;
+  }
+
+  if (calendarLoadError) {
+    var error = document.createElement("div");
+    error.className = "holiday-empty";
+    error.textContent = "목록을 불러오지 못했습니다. Supabase SQL 실행 여부를 확인해주세요.";
+    holidayList.appendChild(error);
+    return;
+  }
+
+  if (!calendarDays.length) {
+    var empty = document.createElement("div");
+    empty.className = "holiday-empty";
+    empty.textContent = "저장된 날짜가 없습니다.";
+    holidayList.appendChild(empty);
+    return;
+  }
+
+  calendarDays.slice().sort(function(a, b) {
+    return a.date.localeCompare(b.date);
+  }).forEach(function(day) {
+    var item = document.createElement("div");
+    item.className = "holiday-item";
+
+    var text = document.createElement("span");
+    text.textContent = koreanDateShort(day.date) + " · " + calendarStatusText(day.status);
+    var small = document.createElement("small");
+    small.textContent = day.label || (day.status === "workday" ? "정상근무" : "휴일");
+    text.appendChild(small);
+
+    var edit = document.createElement("button");
+    edit.type = "button";
+    edit.className = "btn";
+    edit.textContent = "수정";
+    edit.addEventListener("click", function() {
+      setLeaveDateInput(holidayDateInput, day.date);
+      if (holidayStatusInput) holidayStatusInput.value = day.status;
+      if (holidayLabelInput) holidayLabelInput.value = day.label || "";
+    });
+
+    var del = document.createElement("button");
+    del.type = "button";
+    del.className = "btn danger";
+    del.textContent = "삭제";
+    del.addEventListener("click", function() {
+      showNotice(koreanDateShort(day.date) + " 설정을 삭제합니다.", "danger", "삭제", function() {
+        hideNotice();
+        deleteCalendarDay(day.date).catch(function(error) {
+          showNotice("설정 삭제 실패: " + error.message, "danger");
+        });
+      }, true);
+    });
+
+    item.appendChild(text);
+    item.appendChild(edit);
+    item.appendChild(del);
+    holidayList.appendChild(item);
+  });
+}
+async function openHolidayAdminModal() {
+  var key = adminKey || prompt("관리자 비밀번호를 입력해주세요.");
+  if (!key) return;
+  try {
+    await holidayApi("GET", null, "?check=1&key=" + encodeURIComponent(key));
+    adminKey = key;
+  } catch (error) {
+    showNotice("관리자 비밀번호가 올바르지 않습니다.", "danger");
+    return;
+  }
+
+  setLeaveDateInput(holidayDateInput, selectedTeamDate || todayText);
+  if (holidayStatusInput) holidayStatusInput.value = "holiday";
+  if (holidayLabelInput) holidayLabelInput.value = "";
+  renderHolidayList("목록을 불러오는 중입니다.");
+  if (holidayOverlay) {
+    holidayOverlay.classList.add("active");
+    holidayOverlay.setAttribute("aria-hidden", "false");
+  }
+  await loadCalendarDays(true);
+  renderHolidayList();
+}
+function closeHolidayAdminModal() {
+  if (!holidayOverlay) return;
+  holidayOverlay.classList.remove("active");
+  holidayOverlay.setAttribute("aria-hidden", "true");
+}
+async function saveCalendarDay() {
+  if (!adminKey) {
+    showNotice("관리자 비밀번호를 먼저 입력해주세요.", "danger");
+    return;
+  }
+  var date = leaveDateValue(holidayDateInput);
+  var statusValue = holidayStatusInput ? holidayStatusInput.value : "holiday";
+  var label = holidayLabelInput ? holidayLabelInput.value.trim() : "";
+  if (!date) {
+    showNotice("날짜를 선택해주세요.", "danger");
+    return;
+  }
+  await holidayApi("POST", {
+    date: date,
+    status: statusValue,
+    label: label || calendarStatusText(statusValue)
+  }, "?key=" + encodeURIComponent(adminKey));
+  await loadCalendarDays(true);
+  renderHolidayList();
+  renderCalendar();
+  render();
+  showNotice("날짜 설정을 저장했습니다.");
+}
+async function deleteCalendarDay(date) {
+  if (!adminKey) {
+    showNotice("관리자 비밀번호를 먼저 입력해주세요.", "danger");
+    return;
+  }
+  await holidayApi("DELETE", null, "?date=" + encodeURIComponent(date) + "&key=" + encodeURIComponent(adminKey));
+  await loadCalendarDays(true);
+  renderHolidayList();
+  renderCalendar();
+  render();
+  showNotice("날짜 설정을 삭제했습니다.");
+}
 function groupByOwner(items) {
   var map = {};
   ownerNames.forEach(function(owner) {
@@ -1609,7 +1800,7 @@ function makeTeamScreenshot(period) {
     if (isWeek) {
       return item.date >= range.start &&
         item.date <= range.end &&
-        isWeekdayDate(parseDateText(item.date));
+        isBusinessDate(parseDateText(item.date));
     }
     return item.date === selectedTeamDate;
   });
@@ -1833,6 +2024,50 @@ if (dateInput) {
     openCalendar("formDate", leaveDateValue(dateInput) || todayText);
   });
 }
+if (holidayDateInput) {
+  holidayDateInput.addEventListener("click", function() {
+    openCalendar("holidayDate", leaveDateValue(holidayDateInput) || selectedTeamDate || todayText);
+  });
+}
+if (holidaySaveBtn) {
+  holidaySaveBtn.addEventListener("click", function() {
+    saveCalendarDay().catch(function(error) {
+      showNotice("날짜 설정 저장 실패: " + error.message, "danger");
+    });
+  });
+}
+if (holidayCloseBtn) {
+  holidayCloseBtn.addEventListener("click", closeHolidayAdminModal);
+}
+if (holidayOverlay) {
+  holidayOverlay.addEventListener("click", function(e) {
+    if (e.target === holidayOverlay) closeHolidayAdminModal();
+  });
+}
+if (appTitle) {
+  var titlePressTimer = null;
+  var titlePressFired = false;
+  var cancelTitlePress = function() {
+    if (titlePressTimer) clearTimeout(titlePressTimer);
+    titlePressTimer = null;
+  };
+  appTitle.addEventListener("pointerdown", function() {
+    titlePressFired = false;
+    cancelTitlePress();
+    titlePressTimer = setTimeout(function() {
+      titlePressFired = true;
+      openHolidayAdminModal().catch(function(error) {
+        showNotice("휴일 설정 열기 실패: " + error.message, "danger");
+      });
+    }, 2000);
+  });
+  ["pointerup", "pointerleave", "pointercancel"].forEach(function(eventName) {
+    appTitle.addEventListener(eventName, cancelTitlePress);
+  });
+  appTitle.addEventListener("click", function(e) {
+    if (titlePressFired) e.preventDefault();
+  });
+}
 if (dayScreenshotBtn) {
   dayScreenshotBtn.addEventListener("click", downloadResolvedScreenshot);
 }
@@ -1930,7 +2165,13 @@ document.querySelectorAll("[data-period]").forEach(function(button) {
 });
 if (teamDatePicker) {
   teamDatePicker.addEventListener("change", function() {
-    selectedTeamDate = teamDatePicker.value || todayText;
+    var nextDate = teamDatePicker.value || todayText;
+    if (isNonWorkingDateText(nextDate)) {
+      showNotice("휴일에는 일일현황을 조회할 수 없습니다. 다른 날짜를 선택해주세요.", "danger");
+      teamDatePicker.value = selectedTeamDate;
+      return;
+    }
+    selectedTeamDate = nextDate;
     openedTeamOwner = "";
     loadCompletionsForSelectedDate();
   });
@@ -2033,8 +2274,8 @@ form.addEventListener("submit", async function(e) {
     showNotice("날짜를 선택해주세요.", "danger");
     return;
   }
-  if (isWeekendDateText(reportDate)) {
-    showNotice("주말에는 거래처 입력이 불가능합니다. 다른 날짜를 선택해주세요.", "danger");
+  if (isNonWorkingDateText(reportDate)) {
+    showNotice("휴일에는 거래처 입력이 불가능합니다. 다른 날짜를 선택해주세요.", "danger");
     return;
   }
 

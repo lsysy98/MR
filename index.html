@@ -24,7 +24,7 @@
     }
     body { margin: 0; background: var(--bg); color: var(--text); font-family: "Malgun Gothic", system-ui, sans-serif; }
     header { background: var(--panel); border-bottom: 1px solid var(--line); padding: 14px 16px; position: sticky; top: 0; z-index: 5; }
-    h1 { margin: 0; font-size: 19px; }
+    h1 { margin: 0; font-size: 19px; user-select: none; }
     h2 { margin: 0; font-size: 17px; }
     button, input, select { font: inherit; }
     main { max-width: 1120px; margin: 0 auto; padding: 14px; display: grid; grid-template-columns: 360px 1fr; gap: 14px; }
@@ -88,7 +88,7 @@
       background: #c24141;
       border-color: #c24141;
     }
-    .leave-overlay {
+    .leave-overlay, .holiday-overlay {
       position: fixed;
       inset: 0;
       z-index: 50;
@@ -98,8 +98,8 @@
       padding: 18px;
       background: rgba(23, 33, 28, .28);
     }
-    .leave-overlay.active { display: flex; }
-    .leave-box {
+    .leave-overlay.active, .holiday-overlay.active { display: flex; }
+    .leave-box, .holiday-box {
       width: min(360px, 100%);
       display: grid;
       gap: 12px;
@@ -109,15 +109,16 @@
       border-radius: 8px;
       box-shadow: 0 18px 44px rgba(27,45,37,.22);
     }
-    .leave-box h3 { margin: 0; font-size: 17px; }
-    .leave-box p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.45; }
-    .leave-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-    .leave-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-    .leave-actions .wide { grid-column: 1 / -1; }
-    .leave-list-wrap { display: grid; gap: 8px; border-top: 1px solid var(--line); padding-top: 10px; }
-    .leave-list-title { font-size: 13px; font-weight: 900; color: var(--muted); }
-    .leave-list { display: grid; gap: 6px; max-height: 190px; overflow: auto; }
-    .leave-item {
+    .leave-box h3, .holiday-box h3 { margin: 0; font-size: 17px; }
+    .leave-box p, .holiday-box p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.45; }
+    .leave-grid, .holiday-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .holiday-grid.single { grid-template-columns: 1fr; }
+    .leave-actions, .holiday-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .leave-actions .wide, .holiday-actions .wide { grid-column: 1 / -1; }
+    .leave-list-wrap, .holiday-list-wrap { display: grid; gap: 8px; border-top: 1px solid var(--line); padding-top: 10px; }
+    .leave-list-title, .holiday-list-title { font-size: 13px; font-weight: 900; color: var(--muted); }
+    .leave-list, .holiday-list { display: grid; gap: 6px; max-height: 190px; overflow: auto; }
+    .leave-item, .holiday-item {
       display: grid;
       grid-template-columns: 1fr auto auto;
       gap: 6px;
@@ -139,9 +140,10 @@
       font-size: 12px;
       font-weight: 900;
     }
-    .leave-item span { font-size: 13px; font-weight: 800; }
-    .leave-item .btn { min-height: 34px; padding: 0 9px; font-size: 12px; }
-    .leave-empty { color: var(--muted); font-size: 13px; padding: 8px; border: 1px dashed var(--line); border-radius: 8px; }
+    .leave-item span, .holiday-item span { font-size: 13px; font-weight: 800; }
+    .holiday-item small { display: block; margin-top: 2px; color: var(--muted); font-size: 12px; font-weight: 700; }
+    .leave-item .btn, .holiday-item .btn { min-height: 34px; padding: 0 9px; font-size: 12px; }
+    .leave-empty, .holiday-empty { color: var(--muted); font-size: 13px; padding: 8px; border: 1px dashed var(--line); border-radius: 8px; }
     .notice-actions { display: grid; grid-template-columns: 1fr; gap: 8px; }
     .notice-actions.has-action { grid-template-columns: 1fr 1fr; }
     #noticeActionBtn { display: none; }
@@ -183,6 +185,7 @@
     }
     .calendar-day.blank { border-color: transparent; background: transparent; cursor: default; }
     .calendar-day.holiday, .calendar-day.weekend { background: #fff1f1; border-color: #efc8c8; color: #c24141; }
+    .calendar-day.workday { background: #ecf9f3; border-color: #98d8bf; color: #0f5b47; }
     .calendar-day.today { border-color: var(--green); }
     .calendar-day.selected { background: var(--green); border-color: var(--green); color: #fff; }
     .status { border: 1px solid #cbd8d1; border-radius: 8px; padding: 10px 12px; background: #fbfdfc; color: var(--muted); font-size: 13px; }
@@ -521,7 +524,7 @@
 </head>
 <body class="view-dashboard">
   <header>
-    <h1>MR수도권팀 일일보고</h1>
+    <h1 id="appTitle">MR수도권팀 일일보고</h1>
     <div class="mobile-tabs" aria-label="화면 선택">
       <button class="mobile-tab" type="button" data-view="form">작성하기</button>
       <button class="mobile-tab active" type="button" data-view="dashboard">월간현황</button>
@@ -716,6 +719,34 @@
       </div>
     </div>
   </div>
+  <div class="holiday-overlay" id="holidayOverlay" aria-hidden="true">
+    <div class="holiday-box" role="dialog" aria-modal="true" aria-labelledby="holidayTitle">
+      <h3 id="holidayTitle">휴일/근무일 설정</h3>
+      <p>기본 달력이 틀렸거나 회사 휴무일이 있으면 날짜를 직접 지정합니다.</p>
+      <div class="holiday-grid">
+        <label>날짜<span class="date-input-wrap"><input id="holidayDate" type="text" readonly></span></label>
+        <label>처리 방식
+          <select id="holidayStatus">
+            <option value="holiday">휴일로 지정</option>
+            <option value="workday">근무일로 지정</option>
+          </select>
+        </label>
+      </div>
+      <div class="holiday-grid single">
+        <label>이름<input id="holidayLabel" type="text" placeholder="예: 제헌절, 회사휴무, 정상근무"></label>
+      </div>
+      <div class="holiday-list-wrap">
+        <div class="holiday-list-title">직접 지정한 날짜</div>
+        <div class="holiday-list" id="holidayList">
+          <div class="holiday-empty">저장된 날짜가 없습니다.</div>
+        </div>
+      </div>
+      <div class="holiday-actions">
+        <button class="btn primary" type="button" id="holidaySaveBtn">저장</button>
+        <button class="btn wide" type="button" id="holidayCloseBtn">닫기</button>
+      </div>
+    </div>
+  </div>
   <div class="calendar-overlay" id="calendarOverlay" aria-hidden="true">
     <div class="calendar-box" role="dialog" aria-modal="true" aria-labelledby="calendarTitle">
       <div class="calendar-head">
@@ -742,6 +773,6 @@
       </div>
     </div>
   </div>
-  <script src="app.js?v=20260713-0608"></script>
+  <script src="app.js?v=20260716-1010"></script>
 </body>
 </html>
