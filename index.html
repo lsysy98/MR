@@ -24,7 +24,20 @@
     }
     body { margin: 0; background: var(--bg); color: var(--text); font-family: "Malgun Gothic", system-ui, sans-serif; }
     header { background: var(--panel); border-bottom: 1px solid var(--line); padding: 14px 16px; position: sticky; top: 0; z-index: 5; }
+    .header-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
     h1 { margin: 0; font-size: 19px; user-select: none; }
+    .header-settings {
+      min-height: 34px;
+      border: 1px solid #bfd0c8;
+      border-radius: 8px;
+      background: #fff;
+      color: #0f5b47;
+      padding: 0 12px;
+      font-size: 13px;
+      font-weight: 800;
+      cursor: pointer;
+      white-space: nowrap;
+    }
     h2 { margin: 0; font-size: 17px; }
     button, input, select { font: inherit; }
     main { max-width: 1120px; margin: 0 auto; padding: 14px; display: grid; grid-template-columns: 360px 1fr; gap: 14px; }
@@ -472,6 +485,7 @@
     .empty { color: var(--muted); text-align: center; padding: 18px 10px; border: 1px dashed #cbd8d1; border-radius: 8px; background: #fff; }
     @media (max-width: 900px) {
       header { padding: 12px 12px 10px; }
+      .header-settings { min-height: 32px; padding: 0 9px; font-size: 12px; }
       .mobile-tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 10px; padding: 4px; border: 1px solid #cbd8d1; border-radius: 8px; background: #f5f8f6; }
       .mobile-tab { min-height: 38px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); font-weight: 800; cursor: pointer; }
       .mobile-tab.active { background: var(--green); color: #fff; }
@@ -524,7 +538,10 @@
 </head>
 <body class="view-dashboard">
   <header>
-    <h1 id="appTitle">MR수도권팀 일일보고</h1>
+    <div class="header-top">
+      <h1 id="appTitle">MR수도권팀 일일보고</h1>
+      <button class="header-settings" type="button" id="holidayQuickBtn">휴일 설정</button>
+    </div>
     <div class="mobile-tabs" aria-label="화면 선택">
       <button class="mobile-tab" type="button" data-view="form">작성하기</button>
       <button class="mobile-tab active" type="button" data-view="dashboard">월간현황</button>
@@ -773,6 +790,6 @@
       </div>
     </div>
   </div>
-  <script src="app.js?v=20260716-1010"></script>
+  <script src="app.js?v=20260716-1024"></script>
 </body>
 </html>

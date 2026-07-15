@@ -10,7 +10,7 @@ var collectionYear = defaultCollection.year;
 var collectionMonth = defaultCollection.month;
 var reports = [];
 var dailyCompletions = [];
-var calendarDays = [];
+var teamCalendarDays = [];
 var calendarLoadError = "";
 var adminKey = "";
 var completionLoadError = "";
@@ -28,6 +28,7 @@ var ownerNames = ["성진욱", "김무영", "이승엽", "김태홍", "제성규
 
 var form = document.getElementById("reportForm");
 var appTitle = document.getElementById("appTitle");
+var holidayQuickBtn = document.getElementById("holidayQuickBtn");
 var ownerInput = document.getElementById("owner");
 var dateInput = document.getElementById("date");
 var clientInput = document.getElementById("client");
@@ -220,7 +221,7 @@ function isWeekendDateText(value) {
   return !isWeekdayDate(parseDateText(value));
 }
 function calendarDayOverride(value) {
-  return calendarDays.find(function(day) {
+  return teamCalendarDays.find(function(day) {
     return day.date === value;
   }) || null;
 }
@@ -670,10 +671,10 @@ async function holidayApi(method, body, query) {
 }
 async function loadCalendarDays(skipRender) {
   try {
-    calendarDays = await holidayApi("GET");
+    teamCalendarDays = await holidayApi("GET");
     calendarLoadError = "";
   } catch (error) {
-    calendarDays = [];
+    teamCalendarDays = [];
     calendarLoadError = error.message;
   }
   if (!skipRender) render();
@@ -1354,7 +1355,7 @@ function renderHolidayList(message) {
     return;
   }
 
-  if (!calendarDays.length) {
+  if (!teamCalendarDays.length) {
     var empty = document.createElement("div");
     empty.className = "holiday-empty";
     empty.textContent = "저장된 날짜가 없습니다.";
@@ -1362,7 +1363,7 @@ function renderHolidayList(message) {
     return;
   }
 
-  calendarDays.slice().sort(function(a, b) {
+  teamCalendarDays.slice().sort(function(a, b) {
     return a.date.localeCompare(b.date);
   }).forEach(function(day) {
     var item = document.createElement("div");
@@ -2066,6 +2067,13 @@ if (appTitle) {
   });
   appTitle.addEventListener("click", function(e) {
     if (titlePressFired) e.preventDefault();
+  });
+}
+if (holidayQuickBtn) {
+  holidayQuickBtn.addEventListener("click", function() {
+    openHolidayAdminModal().catch(function(error) {
+      showNotice("휴일 설정 열기 실패: " + error.message, "danger");
+    });
   });
 }
 if (dayScreenshotBtn) {
