@@ -10,6 +10,7 @@ var collectionYear = defaultCollection.year;
 var collectionMonth = defaultCollection.month;
 var reports = [];
 var dailyCompletions = [];
+var weeklyLeaveRows = [];
 var teamCalendarDays = [];
 var calendarLoadError = "";
 var adminKey = "";
@@ -873,6 +874,24 @@ function percentText(amount, target) {
 function reportWonMan(value) {
   return money.format(Math.round(Number(value || 0) / 10000)) + "만원";
 }
+function ownerHasWeeklyLeave(owner, range) {
+  return weeklyLeaveRows.some(function(row) {
+    return row.owner === owner &&
+      (row.status || "") === "leave" &&
+      row.date >= range.start &&
+      row.date <= range.end;
+  });
+}
+async function refreshWeeklyLeaveRows() {
+  var rows = await Promise.all(ownerNames.map(function(owner) {
+    return completionApi("GET", null, "?owner=" + encodeURIComponent(owner) + "&status=leave").catch(function() {
+      return [];
+    });
+  }));
+  weeklyLeaveRows = rows.reduce(function(all, ownerRows) {
+    return all.concat(ownerRows || []);
+  }, []);
+}
 function weeklyReportText() {
   var range = weeklyReportRange();
   var weekItems = dateRangeItems(range);
@@ -883,41 +902,59 @@ function weeklyReportText() {
   var startDate = parseDateText(range.start);
   var endDate = parseDateText(range.end);
   var endIncludesMonth = startDate.getFullYear() !== endDate.getFullYear() || startDate.getMonth() !== endDate.getMonth();
-  var ownerLines = groupByOwner(monthItems)
+  var weekMap = {};
+  groupByOwner(weekItems).forEach(function(group) { weekMap[group.owner] = group; });
+  var monthGroups = groupByOwner(monthItems);
+  var ownerLines = monthGroups
     .sort(function(a, b) {
       var amountDiff = b.summary.total.amount - a.summary.total.amount;
       if (amountDiff !== 0) return amountDiff;
+      var weekAmountDiff = (weekMap[b.owner] ? weekMap[b.owner].summary.total.amount : 0) -
+        (weekMap[a.owner] ? weekMap[a.owner].summary.total.amount : 0);
+      if (weekAmountDiff !== 0) return weekAmountDiff;
       return ownerNames.indexOf(a.owner) - ownerNames.indexOf(b.owner);
     })
-    .map(function(group) {
-      return group.owner + " " + reportWonMan(group.summary.total.amount) + " / " +
-        percentText(group.summary.total.amount, 2000000) + "\n" +
-        "(신규 " + group.summary.new.count + " / 증대 " + group.summary.growth.count + ")";
+    .map(function(monthGroup) {
+      var weekGroup = weekMap[monthGroup.owner] || { summary: summarize([]) };
+      var leaveMark = ownerHasWeeklyLeave(monthGroup.owner, range) ? " *여름휴가" : "";
+      return [
+        monthGroup.owner + leaveMark,
+        "주간 " + reportWonMan(weekGroup.summary.total.amount),
+        "(신규 " + weekGroup.summary.new.count + " / 증대 " + weekGroup.summary.growth.count + ")",
+        "누적 " + reportWonMan(monthGroup.summary.total.amount) + " / " + percentText(monthGroup.summary.total.amount, 2000000),
+        "(신규 " + monthGroup.summary.new.count + " / 증대 " + monthGroup.summary.growth.count + ")"
+      ].join("\n");
     });
 
   return [
     "< 수도권팀 주간보고 >",
     "*" + koreanMonthDay(range.start, true) + " ~ " + koreanMonthDay(range.end, endIncludesMonth) + " (" + weekNumbersText(range.start, range.end) + ")",
     "",
-    "---------------------------",
-    "MR 수도권팀",
-    "",
     "주간 누적 신규 " + weekSummary.new.count + "건 / 증대 " + weekSummary.growth.count + "건",
-    "누적 매출합 " + reportWonMan(weekSummary.total.amount),
+    "누적 매출합 " + reportWonMan(weekSummary.total.amount) + " /",
     "",
-    "---------------------------",
+    "——————————————————",
     String(range.month).padStart(2, "0") + "월 누적 매출",
     "",
     "팀 목표 : " + reportWonMan(targetAmount),
+    "",
+    "누적 신규 : " + monthSummary.new.count + "건 / 증대 : " + monthSummary.growth.count + "건",
     "누적매출 : " + reportWonMan(monthSummary.total.amount) + " / " + percentText(monthSummary.total.amount, targetAmount),
     "",
+    "——————————————————",
     "담당자별 실적",
+    "",
     ownerLines.join("\n\n")
   ].join("\n");
 }
 function updateWeeklyReportPreview() {
   if (!weeklyReportPreview) return;
   weeklyReportPreview.textContent = weeklyReportText();
+}
+function refreshWeeklyReportPreviewWithLeaves() {
+  refreshWeeklyLeaveRows().then(updateWeeklyReportPreview).catch(function() {
+    updateWeeklyReportPreview();
+  });
 }
 function openWeeklyReportPanel() {
   if (!weeklyReportPanel) return;
@@ -929,6 +966,7 @@ function openWeeklyReportPanel() {
   weeklyReportPanel.classList.add("active");
   weeklyReportPanel.setAttribute("aria-hidden", "false");
   updateWeeklyReportPreview();
+  refreshWeeklyReportPreviewWithLeaves();
 }
 function closeWeeklyReportPanel() {
   if (weeklyReportPanel) weeklyReportPanel.classList.remove("active");
@@ -943,6 +981,7 @@ function toggleWeeklyDateSettings() {
   if (weeklyDateToggleBtn) weeklyDateToggleBtn.textContent = open ? "날짜 설정 닫기" : "날짜 설정";
 }
 async function copyWeeklyReportText() {
+  await refreshWeeklyLeaveRows();
   var text = weeklyReportText();
   if (navigator.clipboard && navigator.clipboard.writeText) {
     await navigator.clipboard.writeText(text);
