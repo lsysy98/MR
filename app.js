@@ -1,4 +1,4 @@
-var money = new Intl.NumberFormat("ko-KR");
+﻿var money = new Intl.NumberFormat("ko-KR");
 var today = new Date();
 var todayText = dateText(today);
 var currentYear = today.getFullYear();
@@ -916,9 +916,8 @@ function weeklyReportText() {
     })
     .map(function(monthGroup) {
       var weekGroup = weekMap[monthGroup.owner] || { summary: summarize([]) };
-      var leaveMark = ownerHasWeeklyLeave(monthGroup.owner, range) ? " *여름휴가" : "";
       return [
-        monthGroup.owner + leaveMark,
+        monthGroup.owner,
         "주간 " + reportWonMan(weekGroup.summary.total.amount),
         "(신규 " + weekGroup.summary.new.count + " / 증대 " + weekGroup.summary.growth.count + ")",
         "누적 " + reportWonMan(monthGroup.summary.total.amount) + " / " + percentText(monthGroup.summary.total.amount, 2000000),
@@ -966,7 +965,6 @@ function openWeeklyReportPanel() {
   weeklyReportPanel.classList.add("active");
   weeklyReportPanel.setAttribute("aria-hidden", "false");
   updateWeeklyReportPreview();
-  refreshWeeklyReportPreviewWithLeaves();
 }
 function closeWeeklyReportPanel() {
   if (weeklyReportPanel) weeklyReportPanel.classList.remove("active");
@@ -981,7 +979,6 @@ function toggleWeeklyDateSettings() {
   if (weeklyDateToggleBtn) weeklyDateToggleBtn.textContent = open ? "날짜 설정 닫기" : "날짜 설정";
 }
 async function copyWeeklyReportText() {
-  await refreshWeeklyLeaveRows();
   var text = weeklyReportText();
   if (navigator.clipboard && navigator.clipboard.writeText) {
     await navigator.clipboard.writeText(text);
@@ -2375,3 +2372,4 @@ updateAmountPreview();
 loadData().catch(function(error) {
   status("연결 실패: " + error.message, "error");
 });
+
