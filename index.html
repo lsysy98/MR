@@ -651,6 +651,8 @@
     }
     .success-case-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
     .meeting-panel { grid-column: 2; }
+    .meeting-month-nav { margin-bottom: 12px; }
+    #meetingMonthPicker { font-weight: 800; text-align: center; }
     .meeting-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
     .meeting-grid.meeting-slide-mode { grid-template-columns: 1fr; }
     .meeting-owner-card {
@@ -802,7 +804,7 @@
       padding-bottom: 20px;
     }
     .presentation-head span { color: var(--green); font-size: 22px; font-weight: 900; letter-spacing: 0; }
-    .presentation-head h2 { margin: 6px 0 0; font-size: clamp(44px, 7vw, 86px); line-height: .95; }
+    .presentation-head h2 { margin: 6px 0 0; font-size: clamp(38px, 5.6vw, 68px); line-height: .95; }
     .presentation-total-card {
       display: grid;
       gap: 9px;
@@ -814,8 +816,8 @@
       box-shadow: 0 14px 34px rgba(95, 58, 27, .12);
     }
     .presentation-total-card span { color: var(--muted); font-size: 17px; letter-spacing: 0; }
-    .presentation-total-card strong { font-size: clamp(44px, 7.2vw, 82px); line-height: .95; color: #201a16; }
-    .presentation-total-card small { color: #c64e13; font-size: 16px; font-weight: 900; }
+    .presentation-total-card strong { font-size: clamp(36px, 5.8vw, 66px); line-height: .95; color: #201a16; }
+    .presentation-total-card small { color: #c64e13; font-size: 18px; font-weight: 900; }
     .presentation-progress {
       height: 15px;
       border-radius: 999px;
@@ -846,6 +848,7 @@
     }
     .presentation-metric.count-focus span { color: #c64e13; font-size: 18px; }
     .presentation-metric.count-focus strong { font-size: clamp(26px, 4vw, 42px); color: #201a16; }
+    .presentation-metric.count-focus small { color: #c64e13; font-size: 18px; }
     .presentation-metric.count-sub strong { font-size: clamp(26px, 4vw, 42px); }
     .presentation-metric.client-focus strong { color: #c64e13; font-size: clamp(22px, 3vw, 34px); }
     .presentation-body { display: grid; grid-template-columns: .8fr 1.2fr; gap: 12px; align-items: start; }
@@ -940,7 +943,7 @@
       .presentation-stage { min-height: calc(100vh - 16px); max-height: calc(100vh - 16px); padding: 22px 14px 14px; gap: 12px; border-radius: 8px; }
       .presentation-head { display: grid; padding-right: 58px; gap: 10px; }
       .presentation-total-card { padding: 16px; }
-      .presentation-total-card strong { font-size: 42px; }
+      .presentation-total-card strong { font-size: 38px; }
       .presentation-metrics, .presentation-body { grid-template-columns: 1fr; }
       .presentation-metric.count-focus strong { font-size: 42px; }
       .presentation-cases { min-height: 220px; }
@@ -1116,6 +1119,16 @@
         <div class="head"><h2>회의자료</h2></div>
         <div class="body">
           <div class="summary-title" id="meetingMonthLabel">이번 달 실적</div>
+          <div class="month-nav meeting-month-nav">
+            <div class="month-main">
+              <input id="meetingMonthPicker" type="month" aria-label="회의자료 월 선택">
+            </div>
+            <div class="month-actions">
+              <button class="btn" type="button" id="meetingPrevMonthBtn">전 월</button>
+              <button class="btn" type="button" id="meetingCurrentMonthBtn">현재</button>
+              <button class="btn" type="button" id="meetingNextMonthBtn">다음 월</button>
+            </div>
+          </div>
           <div class="meeting-grid" id="meetingCards"></div>
         </div>
       </section>

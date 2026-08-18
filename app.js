@@ -43,6 +43,10 @@ var ownerCards = document.getElementById("ownerCards");
 var todayOwnerCards = document.getElementById("todayOwnerCards");
 var meetingCards = document.getElementById("meetingCards");
 var meetingMonthLabel = document.getElementById("meetingMonthLabel");
+var meetingMonthPicker = document.getElementById("meetingMonthPicker");
+var meetingPrevMonthBtn = document.getElementById("meetingPrevMonthBtn");
+var meetingCurrentMonthBtn = document.getElementById("meetingCurrentMonthBtn");
+var meetingNextMonthBtn = document.getElementById("meetingNextMonthBtn");
 var todayEmpty = document.getElementById("todayEmpty");
 var statusBox = document.getElementById("statusBox");
 var monthPicker = document.getElementById("monthPicker");
@@ -338,6 +342,14 @@ function nextCollectionMonth(d) {
 function monthValue() {
   return selectedYear + "-" + String(selectedMonth).padStart(2, "0");
 }
+function setSelectedMonthFromValue(value) {
+  if (!value) return;
+  var parts = value.split("-");
+  selectedYear = Number(parts[0]);
+  selectedMonth = Number(parts[1]);
+  syncMonthPicker();
+  render();
+}
 function makeId() {
   return Date.now() + "-" + Math.random().toString(16).slice(2);
 }
@@ -589,6 +601,7 @@ function updateTypeButtons() {
 }
 function syncMonthPicker() {
   if (monthPicker) monthPicker.value = monthValue();
+  if (meetingMonthPicker) meetingMonthPicker.value = monthValue();
 }
 function syncCollectionButtons() {
   if (collectionLabel) {
@@ -1898,7 +1911,7 @@ function productSummary(items) {
 function renderMeetingCards(items) {
   if (!meetingCards) return;
   meetingCards.textContent = "";
-  if (meetingMonthLabel) meetingMonthLabel.textContent = selectedYear + "년 " + String(selectedMonth).padStart(2, "0") + "월 실적";
+  if (meetingMonthLabel) meetingMonthLabel.textContent = "회의자료 기준 월";
 
   var groups = groupByOwner(items).sort(function(a, b) {
     var amountDiff = b.summary.total.amount - a.summary.total.amount;
@@ -2709,6 +2722,15 @@ document.getElementById("nextCollectionBtn").addEventListener("click", function(
 document.getElementById("prevMonthBtn").addEventListener("click", function() { moveMonth(-1); });
 document.getElementById("nextMonthBtn").addEventListener("click", function() { moveMonth(1); });
 document.getElementById("currentMonthBtn").addEventListener("click", resetToCurrentMonth);
+if (meetingPrevMonthBtn) {
+  meetingPrevMonthBtn.addEventListener("click", function() { moveMonth(-1); });
+}
+if (meetingNextMonthBtn) {
+  meetingNextMonthBtn.addEventListener("click", function() { moveMonth(1); });
+}
+if (meetingCurrentMonthBtn) {
+  meetingCurrentMonthBtn.addEventListener("click", resetToCurrentMonth);
+}
 document.getElementById("cancelEditBtn").addEventListener("click", resetFormAll);
 document.querySelectorAll("[data-view]").forEach(function(button) {
   button.addEventListener("click", function() {
@@ -2811,12 +2833,13 @@ document.getElementById("nextWeekBtn").addEventListener("click", function() {
   moveSelectedWeek(1);
 });
 monthPicker.addEventListener("change", function() {
-  if (!monthPicker.value) return;
-  var parts = monthPicker.value.split("-");
-  selectedYear = Number(parts[0]);
-  selectedMonth = Number(parts[1]);
-  render();
+  setSelectedMonthFromValue(monthPicker.value);
 });
+if (meetingMonthPicker) {
+  meetingMonthPicker.addEventListener("change", function() {
+    setSelectedMonthFromValue(meetingMonthPicker.value);
+  });
+}
 
 form.addEventListener("submit", async function(e) {
   e.preventDefault();
