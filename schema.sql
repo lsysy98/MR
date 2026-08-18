@@ -11,7 +11,8 @@ create table if not exists public.reports (
   amount numeric not null default 0,
   collection_year integer,
   collection_month integer check (collection_month between 1 and 12),
-  prescription_done boolean not null default false
+  prescription_done boolean not null default false,
+  success_case text
 );
 
 alter table public.reports
@@ -25,6 +26,9 @@ alter table public.reports
 
 alter table public.reports
   add column if not exists branch_name text;
+
+alter table public.reports
+  add column if not exists success_case text;
 
 create index if not exists reports_report_date_idx on public.reports (report_date);
 create index if not exists reports_owner_idx on public.reports (owner);

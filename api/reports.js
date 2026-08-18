@@ -74,7 +74,8 @@ function toDb(item) {
     amount: Number(item.amount || 0),
     collection_year: item.collectionYear ? Number(item.collectionYear) : null,
     collection_month: item.collectionMonth ? Number(item.collectionMonth) : null,
-    prescription_done: Boolean(item.prescriptionDone)
+    prescription_done: Boolean(item.prescriptionDone),
+    success_case: item.successCase || ""
   };
 }
 
@@ -92,7 +93,8 @@ function fromDb(row) {
     amount: Number(row.amount || 0),
     collectionYear: row.collection_year ? Number(row.collection_year) : null,
     collectionMonth: row.collection_month ? Number(row.collection_month) : null,
-    prescriptionDone: Boolean(row.prescription_done)
+    prescriptionDone: Boolean(row.prescription_done),
+    successCase: row.success_case || ""
   };
 }
 function logRow(action, actor, beforeRow, afterRow) {

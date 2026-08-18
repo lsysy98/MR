@@ -23,6 +23,8 @@ var selectedWeekYear = today.getFullYear();
 var selectedWeekMonth = today.getMonth() + 1;
 var openedOwner = "";
 var openedTeamOwner = "";
+var openedReportId = "";
+var selectedMeetingOwner = "";
 var ownerFilters = {};
 var editingId = "";
 var ownerNames = ["성진욱", "김무영", "이승엽", "김태홍", "제성규", "송진영", "이현욱"];
@@ -39,6 +41,8 @@ var amountInput = document.getElementById("amount");
 var amountPreview = document.getElementById("amountPreview");
 var ownerCards = document.getElementById("ownerCards");
 var todayOwnerCards = document.getElementById("todayOwnerCards");
+var meetingCards = document.getElementById("meetingCards");
+var meetingMonthLabel = document.getElementById("meetingMonthLabel");
 var todayEmpty = document.getElementById("todayEmpty");
 var statusBox = document.getElementById("statusBox");
 var monthPicker = document.getElementById("monthPicker");
@@ -94,7 +98,13 @@ var noticeText = document.getElementById("noticeText");
 var noticeOkBtn = document.getElementById("noticeOkBtn");
 var noticeActions = document.getElementById("noticeActions");
 var noticeActionBtn = document.getElementById("noticeActionBtn");
+var successCaseOverlay = document.getElementById("successCaseOverlay");
+var successCaseClient = document.getElementById("successCaseClient");
+var successCaseText = document.getElementById("successCaseText");
+var successCaseSaveBtn = document.getElementById("successCaseSaveBtn");
+var successCaseCloseBtn = document.getElementById("successCaseCloseBtn");
 var noticeActionHandler = null;
+var successCaseEditingId = "";
 var noticeLocked = false;
 var noticeActionRequired = false;
 var ownerLeaveRows = [];
@@ -1537,7 +1547,12 @@ function prescriptionButton(item) {
 }
 function reportCard(item, index) {
   var card = document.createElement("div");
-  card.className = "report-card " + typeClass(item.type);
+  card.className = "report-card " + typeClass(item.type) + (openedReportId === item.id ? " open" : "");
+  card.dataset.reportId = item.id;
+  card.addEventListener("click", function() {
+    openedReportId = openedReportId === item.id ? "" : item.id;
+    render();
+  });
 
   var number = document.createElement("div");
   number.className = "report-number";
@@ -1551,6 +1566,12 @@ function reportCard(item, index) {
   client.className = "client";
   client.textContent = item.client;
   clientWrap.appendChild(client);
+  if (item.successCase) {
+    var mark = document.createElement("span");
+    mark.className = "success-case-mark";
+    mark.textContent = "★ 성공사례";
+    clientWrap.appendChild(mark);
+  }
   if (item.branchName) {
     var branch = document.createElement("span");
     branch.className = "branch-name";
@@ -1567,15 +1588,37 @@ function reportCard(item, index) {
   info.className = "report-info";
   info.textContent = item.date + " · 수거 " + collectionMonthOf(item) + "월 · " + item.product;
 
+  if (item.successCase) {
+    var casePreview = document.createElement("div");
+    casePreview.className = "success-case-preview";
+    casePreview.textContent = item.successCase;
+  }
+
   var bottom = document.createElement("div");
   bottom.className = "report-bottom";
+  var bottomLeft = document.createElement("div");
+  bottomLeft.className = "report-bottom-left";
   var badge = document.createElement("span");
   badge.className = "badge " + typeClass(item.type);
   badge.textContent = item.type;
+  var prescriptionState = document.createElement("span");
+  prescriptionState.className = "prescription-state " + (item.prescriptionDone ? "done" : "pending");
+  prescriptionState.textContent = item.prescriptionDone ? "통계입력 완료" : "미완료";
+  bottomLeft.appendChild(badge);
+  bottomLeft.appendChild(prescriptionState);
 
   var actions = document.createElement("div");
   actions.className = "report-actions";
   actions.appendChild(prescriptionButton(item));
+
+  var caseBtn = document.createElement("button");
+  caseBtn.className = "btn";
+  caseBtn.type = "button";
+  caseBtn.textContent = item.successCase ? "사례수정" : "성공사례";
+  caseBtn.addEventListener("click", function(e) {
+    e.stopPropagation();
+    openSuccessCaseModal(item);
+  });
 
   var edit = document.createElement("button");
   edit.className = "btn";
@@ -1598,14 +1641,16 @@ function reportCard(item, index) {
     });
   });
 
+  actions.appendChild(caseBtn);
   actions.appendChild(edit);
   actions.appendChild(del);
-  bottom.appendChild(badge);
+  bottom.appendChild(bottomLeft);
   bottom.appendChild(actions);
 
   card.appendChild(number);
   card.appendChild(top);
   card.appendChild(info);
+  if (casePreview) card.appendChild(casePreview);
   card.appendChild(bottom);
   return card;
 }
@@ -1645,13 +1690,17 @@ function renderOwnerCards(items) {
     var achievementRate = ownerAchievementRate(summary.total.amount);
     var card = document.createElement("div");
     card.className = "owner-card" + (openedOwner === group.owner ? " open" : "");
+    card.dataset.owner = group.owner;
 
     var button = document.createElement("button");
     button.type = "button";
     button.className = "owner-button" + (openedOwner === group.owner ? " active" : "");
     button.addEventListener("click", function() {
-      openedOwner = openedOwner === group.owner ? "" : group.owner;
+      var willOpen = openedOwner !== group.owner;
+      openedOwner = willOpen ? group.owner : "";
+      openedReportId = "";
       render();
+      if (willOpen) scrollOpenedOwnerIntoView(ownerCards, group.owner);
     });
 
     var name = document.createElement("div");
@@ -1678,17 +1727,6 @@ function renderOwnerCards(items) {
     detailSummary.className = "owner-detail-summary";
     addDetailMetric(detailSummary, group.owner, "신규", won(summary.new.amount), summary.new.count + "건");
     addDetailMetric(detailSummary, group.owner, "매출증대", won(summary.growth.amount), summary.growth.count + "건");
-
-    var reset = document.createElement("button");
-    reset.type = "button";
-    reset.className = "btn detail-reset";
-    reset.textContent = ownerFilters[group.owner] ? "전체 보기" : "전체";
-    reset.addEventListener("click", function(e) {
-      e.stopPropagation();
-      ownerFilters[group.owner] = "";
-      render();
-    });
-    detailSummary.appendChild(reset);
 
     var detail = document.createElement("div");
     detail.className = "detail-list";
@@ -1732,13 +1770,17 @@ function renderTeamCards(items) {
       (openedTeamOwner === group.owner ? " open" : "") +
       (status === "done" ? " report-done" : "") +
       (status === "leave" ? " report-leave" : "");
+    card.dataset.owner = group.owner;
 
     var button = document.createElement("button");
     button.type = "button";
     button.className = "owner-button" + (openedTeamOwner === group.owner ? " active" : "");
     button.addEventListener("click", function() {
-      openedTeamOwner = openedTeamOwner === group.owner ? "" : group.owner;
+      var willOpen = openedTeamOwner !== group.owner;
+      openedTeamOwner = willOpen ? group.owner : "";
+      openedReportId = "";
       render();
+      if (willOpen) scrollOpenedOwnerIntoView(todayOwnerCards, group.owner);
     });
 
     var name = document.createElement("div");
@@ -1794,6 +1836,477 @@ function renderTeamCards(items) {
     todayOwnerCards.appendChild(card);
   });
 }
+
+function scrollOpenedOwnerIntoView(container, owner) {
+  if (!container || !owner) return;
+  setTimeout(function() {
+    var card = container.querySelector('[data-owner="' + owner + '"]');
+    if (card) {
+      var header = document.querySelector("header");
+      var headerHeight = header ? header.getBoundingClientRect().height : 0;
+      var top = card.getBoundingClientRect().top + window.pageYOffset - headerHeight - 8;
+      window.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+    }
+  }, 0);
+}
+function openSuccessCaseModal(item) {
+  successCaseEditingId = item.id;
+  if (successCaseClient) successCaseClient.textContent = item.owner + " · " + item.client;
+  if (successCaseText) successCaseText.value = item.successCase || "";
+  if (successCaseOverlay) {
+    successCaseOverlay.classList.add("active");
+    successCaseOverlay.setAttribute("aria-hidden", "false");
+  }
+  setTimeout(function() {
+    if (successCaseText) successCaseText.focus();
+  }, 0);
+}
+function closeSuccessCaseModal() {
+  successCaseEditingId = "";
+  if (!successCaseOverlay) return;
+  successCaseOverlay.classList.remove("active");
+  successCaseOverlay.setAttribute("aria-hidden", "true");
+}
+async function saveSuccessCase() {
+  var item = reports.find(function(report) { return report.id === successCaseEditingId; });
+  if (!item) {
+    showNotice("성공사례를 저장할 거래처를 찾지 못했습니다.", "danger");
+    return;
+  }
+  var actor = ownerInput.value.trim() || localStorage.getItem("ownerName") || item.owner || "";
+  var next = Object.assign({}, item, {
+    successCase: successCaseText ? successCaseText.value.trim() : "",
+    updatedAt: Date.now(),
+    actor: actor
+  });
+  var saved = await api("PUT", next);
+  reports = reports.map(function(report) {
+    return report.id === saved.id ? saved : report;
+  });
+  closeSuccessCaseModal();
+  render();
+  showNotice("성공사례를 저장했습니다.");
+}
+function productSummary(items) {
+  var products = ["3제+클로르", "3제", "클로르"];
+  return products.map(function(product) {
+    var productItems = items.filter(function(item) { return item.product === product; });
+    var summary = summarize(productItems);
+    return { product: product, count: summary.total.count, amount: summary.total.amount };
+  });
+}
+function renderMeetingCards(items) {
+  if (!meetingCards) return;
+  meetingCards.textContent = "";
+  if (meetingMonthLabel) meetingMonthLabel.textContent = selectedYear + "년 " + String(selectedMonth).padStart(2, "0") + "월 실적";
+
+  var groups = groupByOwner(items).sort(function(a, b) {
+    var amountDiff = b.summary.total.amount - a.summary.total.amount;
+    if (amountDiff !== 0) return amountDiff;
+    return ownerNames.indexOf(a.owner) - ownerNames.indexOf(b.owner);
+  });
+  if (selectedMeetingOwner && ownerNames.indexOf(selectedMeetingOwner) < 0) selectedMeetingOwner = "";
+
+  if (!selectedMeetingOwner) {
+    meetingCards.className = "meeting-grid meeting-list";
+    groups.forEach(function(group) {
+      var card = document.createElement("button");
+      card.type = "button";
+      card.className = "meeting-owner-card meeting-owner-button";
+      card.addEventListener("click", function() {
+        selectedMeetingOwner = group.owner;
+        renderMeetingCards(items);
+        setTimeout(function() {
+          var panel = document.getElementById("meetingPanel");
+          var header = document.querySelector("header");
+          var headerHeight = header ? header.getBoundingClientRect().height : 0;
+          if (panel) {
+            window.scrollTo({
+              top: Math.max(0, panel.getBoundingClientRect().top + window.pageYOffset - headerHeight - 8),
+              behavior: "smooth"
+            });
+          }
+        }, 0);
+      });
+
+      var head = document.createElement("div");
+      head.className = "meeting-owner-head";
+      var name = document.createElement("strong");
+      name.textContent = group.owner;
+      var rate = document.createElement("span");
+      rate.className = "meeting-rate";
+      rate.textContent = ownerAchievementRate(group.summary.total.amount) + "%";
+      head.appendChild(name);
+      head.appendChild(rate);
+
+      var total = document.createElement("div");
+      total.className = "meeting-total";
+      total.textContent = won(group.summary.total.amount);
+
+      var counts = document.createElement("div");
+      counts.className = "meeting-counts";
+      counts.textContent = "신규 " + group.summary.new.count + "건 · 증대 " + group.summary.growth.count + "건";
+
+      card.appendChild(head);
+      card.appendChild(total);
+      card.appendChild(counts);
+      meetingCards.appendChild(card);
+    });
+    return;
+  }
+
+  meetingCards.className = "meeting-grid meeting-slide-mode";
+  var group = groups.find(function(row) { return row.owner === selectedMeetingOwner; }) || groupByOwner([]).find(function(row) { return row.owner === selectedMeetingOwner; });
+  var slide = document.createElement("div");
+  slide.className = "meeting-slide";
+
+  var slideHead = document.createElement("div");
+  slideHead.className = "meeting-slide-head";
+  var title = document.createElement("div");
+  var eyebrow = document.createElement("span");
+  eyebrow.className = "meeting-eyebrow";
+  eyebrow.textContent = "MR 수도권팀 개인별 회의자료";
+  var name = document.createElement("h3");
+  name.textContent = group.owner;
+  title.appendChild(eyebrow);
+  title.appendChild(name);
+  var back = document.createElement("button");
+  back.type = "button";
+  back.className = "btn";
+  back.textContent = "목록으로";
+  back.addEventListener("click", function() {
+    selectedMeetingOwner = "";
+    renderMeetingCards(items);
+  });
+  var present = document.createElement("button");
+  present.type = "button";
+  present.className = "btn primary";
+  present.textContent = "크게 보기";
+  present.addEventListener("click", function() {
+    openMeetingPresentation(group);
+  });
+  var controls = document.createElement("div");
+  controls.className = "meeting-slide-controls";
+  controls.appendChild(back);
+  controls.appendChild(present);
+  slideHead.appendChild(title);
+  slideHead.appendChild(controls);
+
+  var kpis = document.createElement("div");
+  kpis.className = "meeting-slide-kpis";
+  [
+    { label: "월 누적", value: won(group.summary.total.amount), note: ownerAchievementRate(group.summary.total.amount) + "%" },
+    { label: "신규", value: won(group.summary.new.amount), note: group.summary.new.count + "건" },
+    { label: "매출증대", value: won(group.summary.growth.amount), note: group.summary.growth.count + "건" }
+  ].forEach(function(row) {
+    var kpi = document.createElement("div");
+    kpi.className = "meeting-kpi";
+    var label = document.createElement("span");
+    label.textContent = row.label;
+    var value = document.createElement("strong");
+    value.textContent = row.value;
+    var note = document.createElement("small");
+    note.textContent = row.note;
+    kpi.appendChild(label);
+    kpi.appendChild(value);
+    kpi.appendChild(note);
+    kpis.appendChild(kpi);
+  });
+
+  var productBox = document.createElement("div");
+  productBox.className = "meeting-section";
+  var productTitle = document.createElement("h4");
+  productTitle.textContent = "품목별 요약";
+  var productGrid = document.createElement("div");
+  productGrid.className = "meeting-product-grid";
+  productSummary(group.items).forEach(function(row) {
+    var item = document.createElement("div");
+    item.className = "meeting-product-item";
+    item.innerHTML = "<span></span><strong></strong><small></small>";
+    item.querySelector("span").textContent = row.product;
+    item.querySelector("strong").textContent = row.count + "건";
+    item.querySelector("small").textContent = won(row.amount);
+    productGrid.appendChild(item);
+  });
+  productBox.appendChild(productTitle);
+  productBox.appendChild(productGrid);
+
+  var caseBox = document.createElement("div");
+  caseBox.className = "meeting-section";
+  var caseTitle = document.createElement("h4");
+  caseTitle.textContent = "성공사례";
+  var caseList = document.createElement("div");
+  caseList.className = "meeting-case-list";
+  var caseItems = group.items.filter(function(item) { return item.successCase; });
+  if (caseItems.length) {
+    caseItems.forEach(function(item) {
+      var line = document.createElement("div");
+      line.className = "meeting-case-item";
+      var client = document.createElement("strong");
+      client.textContent = item.client;
+      var text = document.createElement("span");
+      text.textContent = item.successCase;
+      line.appendChild(client);
+      line.appendChild(text);
+      caseList.appendChild(line);
+    });
+  } else {
+    var emptyCase = document.createElement("div");
+    emptyCase.className = "meeting-empty-line";
+    emptyCase.textContent = "작성된 성공사례가 없습니다.";
+    caseList.appendChild(emptyCase);
+  }
+  caseBox.appendChild(caseTitle);
+  caseBox.appendChild(caseList);
+
+  var clientBox = document.createElement("div");
+  clientBox.className = "meeting-section";
+  var clientTitle = document.createElement("h4");
+  clientTitle.textContent = "전체 거래처";
+  var clientList = document.createElement("div");
+  clientList.className = "meeting-client-list";
+  group.items
+    .slice()
+    .sort(function(a, b) { return Number(b.amount || 0) - Number(a.amount || 0); })
+    .forEach(function(item) {
+      var row = document.createElement("div");
+      row.className = "meeting-client-item " + typeClass(item.type);
+      var left = document.createElement("div");
+      var client = document.createElement("strong");
+      client.textContent = item.client;
+      var info = document.createElement("small");
+      info.textContent = item.type + " · " + item.product + " · " + item.date;
+      left.appendChild(client);
+      left.appendChild(info);
+      var amount = document.createElement("b");
+      amount.textContent = won(item.amount);
+      row.appendChild(left);
+      row.appendChild(amount);
+      clientList.appendChild(row);
+    });
+  if (!clientList.children.length) {
+    var emptyClient = document.createElement("div");
+    emptyClient.className = "meeting-empty-line";
+    emptyClient.textContent = "등록된 거래처가 없습니다.";
+    clientList.appendChild(emptyClient);
+  }
+  clientBox.appendChild(clientTitle);
+  clientBox.appendChild(clientList);
+
+  slide.appendChild(slideHead);
+  slide.appendChild(kpis);
+  slide.appendChild(productBox);
+  slide.appendChild(caseBox);
+  slide.appendChild(clientBox);
+  meetingCards.appendChild(slide);
+}
+
+function appendPresentationMetric(parent, label, value, note, extraClass) {
+  var item = document.createElement("div");
+  item.className = "presentation-metric" + (extraClass ? " " + extraClass : "");
+  var labelEl = document.createElement("span");
+  labelEl.textContent = label;
+  var valueEl = document.createElement("strong");
+  valueEl.textContent = value;
+  var noteEl = document.createElement("small");
+  noteEl.textContent = note;
+  item.appendChild(labelEl);
+  item.appendChild(valueEl);
+  item.appendChild(noteEl);
+  parent.appendChild(item);
+}
+function openMeetingPresentation(group) {
+  var overlay = document.createElement("div");
+  overlay.className = "presentation-overlay active";
+  var stage = document.createElement("div");
+  stage.className = "presentation-stage";
+
+  var close = document.createElement("button");
+  close.type = "button";
+  close.className = "presentation-close";
+  close.textContent = "닫기";
+  close.addEventListener("click", function() {
+    overlay.remove();
+  });
+
+  var head = document.createElement("div");
+  head.className = "presentation-head";
+  var title = document.createElement("div");
+  var eyebrow = document.createElement("span");
+  eyebrow.textContent = selectedYear + "년 " + selectedMonth + "월";
+  var name = document.createElement("h2");
+  name.textContent = group.owner;
+  title.appendChild(eyebrow);
+  title.appendChild(name);
+  var rateValue = ownerAchievementRate(group.summary.total.amount);
+  var totalCard = document.createElement("div");
+  totalCard.className = "presentation-total-card";
+  var totalLabel = document.createElement("span");
+  totalLabel.textContent = "월 총 매출";
+  var totalValue = document.createElement("strong");
+  totalValue.textContent = wonMan(group.summary.total.amount);
+  var goalLine = document.createElement("small");
+  goalLine.textContent = "목표 200만원 · 목표대비 " + rateValue + "%";
+  var progress = document.createElement("div");
+  progress.className = "presentation-progress";
+  var progressBar = document.createElement("i");
+  progressBar.style.width = Math.min(100, Math.max(0, rateValue)) + "%";
+  progress.appendChild(progressBar);
+  totalCard.appendChild(totalLabel);
+  totalCard.appendChild(totalValue);
+  totalCard.appendChild(goalLine);
+  totalCard.appendChild(progress);
+  head.appendChild(title);
+  head.appendChild(totalCard);
+
+  var metrics = document.createElement("div");
+  metrics.className = "presentation-metrics";
+  var sortedByAmount = group.items
+    .slice()
+    .sort(function(a, b) { return Number(b.amount || 0) - Number(a.amount || 0); });
+  var topClient = sortedByAmount[0] || null;
+  var caseItems = group.items.filter(function(item) { return item.successCase; });
+  var firstCase = caseItems[0] || null;
+  appendPresentationMetric(metrics, "신규", group.summary.new.count + "건", wonMan(group.summary.new.amount), "count-focus");
+  appendPresentationMetric(metrics, "증대", group.summary.growth.count + "건", wonMan(group.summary.growth.amount), "count-sub");
+  appendPresentationMetric(metrics, "최대 거래처", topClient ? topClient.client : "-", topClient ? wonMan(topClient.amount) : "0원", "client-focus");
+  appendPresentationMetric(metrics, "성공사례", firstCase ? firstCase.client : "-", firstCase ? "작성 완료" : "미작성");
+
+  var body = document.createElement("div");
+  body.className = "presentation-body";
+  var products = document.createElement("div");
+  products.className = "presentation-section";
+  var productTitle = document.createElement("h3");
+  productTitle.textContent = "품목별 요약";
+  products.appendChild(productTitle);
+  productSummary(group.items).forEach(function(row) {
+    var line = document.createElement("div");
+    line.className = "presentation-line";
+    var left = document.createElement("span");
+    left.textContent = row.product + " · " + row.count + "건";
+    var right = document.createElement("strong");
+    right.textContent = won(row.amount);
+    line.appendChild(left);
+    line.appendChild(right);
+    products.appendChild(line);
+  });
+
+  var cases = document.createElement("div");
+  cases.className = "presentation-section presentation-cases";
+  var caseTitle = document.createElement("h3");
+  caseTitle.textContent = "성공사례";
+  cases.appendChild(caseTitle);
+  if (caseItems.length) {
+    caseItems.forEach(function(item) {
+      var line = document.createElement("div");
+      line.className = "presentation-case";
+      var client = document.createElement("strong");
+      client.textContent = "★ " + item.client;
+      var text = document.createElement("span");
+      text.textContent = item.successCase;
+      line.appendChild(client);
+      line.appendChild(text);
+      cases.appendChild(line);
+    });
+  } else {
+    var empty = document.createElement("div");
+    empty.className = "presentation-empty";
+    empty.textContent = "작성된 성공사례가 없습니다.";
+    cases.appendChild(empty);
+  }
+
+  var clients = document.createElement("div");
+  clients.className = "presentation-section presentation-clients";
+  var clientHead = document.createElement("div");
+  clientHead.className = "presentation-section-head";
+  var clientsTitle = document.createElement("h3");
+  clientsTitle.textContent = "전체 거래처";
+  var pageInfo = document.createElement("span");
+  pageInfo.className = "presentation-page-info";
+  clientHead.appendChild(clientsTitle);
+  clientHead.appendChild(pageInfo);
+  var clientRows = document.createElement("div");
+  clientRows.className = "presentation-client-page";
+  var pageControls = document.createElement("div");
+  pageControls.className = "presentation-page-controls";
+  var prevPage = document.createElement("button");
+  prevPage.type = "button";
+  prevPage.className = "btn";
+  prevPage.textContent = "이전 페이지";
+  var nextPage = document.createElement("button");
+  nextPage.type = "button";
+  nextPage.className = "btn primary";
+  nextPage.textContent = "다음 페이지";
+  pageControls.appendChild(prevPage);
+  pageControls.appendChild(nextPage);
+  clients.appendChild(clientHead);
+  clients.appendChild(clientRows);
+  clients.appendChild(pageControls);
+
+  var allClients = group.items
+    .slice()
+    .sort(function(a, b) { return Number(b.amount || 0) - Number(a.amount || 0); });
+  var pageSize = window.innerWidth <= 900 ? 5 : 7;
+  var clientPage = 0;
+  function renderClientPage() {
+    clientRows.textContent = "";
+    var totalPages = Math.max(1, Math.ceil(allClients.length / pageSize));
+    if (clientPage >= totalPages) clientPage = totalPages - 1;
+    if (clientPage < 0) clientPage = 0;
+    pageInfo.textContent = allClients.length ? (clientPage + 1) + " / " + totalPages + "페이지 · " + allClients.length + "건" : "0건";
+    allClients.slice(clientPage * pageSize, clientPage * pageSize + pageSize).forEach(function(item) {
+      var line = document.createElement("div");
+      line.className = "presentation-line";
+      var left = document.createElement("div");
+      left.className = "presentation-client-main";
+      var clientName = document.createElement("strong");
+      clientName.className = "presentation-client-name";
+      clientName.textContent = item.client;
+      var clientMeta = document.createElement("span");
+      clientMeta.textContent = item.type + " · " + item.product;
+      left.appendChild(clientName);
+      left.appendChild(clientMeta);
+      var right = document.createElement("strong");
+      right.className = "presentation-client-amount";
+      right.textContent = won(item.amount);
+      line.appendChild(left);
+      line.appendChild(right);
+      clientRows.appendChild(line);
+    });
+    if (!clientRows.children.length) {
+      var emptyClient = document.createElement("div");
+      emptyClient.className = "presentation-empty";
+      emptyClient.textContent = "등록된 거래처가 없습니다.";
+      clientRows.appendChild(emptyClient);
+    }
+    pageControls.style.display = totalPages > 1 ? "grid" : "none";
+    prevPage.disabled = clientPage <= 0;
+    nextPage.disabled = clientPage >= totalPages - 1;
+  }
+  prevPage.addEventListener("click", function() {
+    clientPage -= 1;
+    renderClientPage();
+  });
+  nextPage.addEventListener("click", function() {
+    clientPage += 1;
+    renderClientPage();
+  });
+  renderClientPage();
+
+  body.appendChild(products);
+  body.appendChild(cases);
+  body.appendChild(clients);
+  stage.appendChild(close);
+  stage.appendChild(head);
+  stage.appendChild(metrics);
+  stage.appendChild(body);
+  overlay.appendChild(stage);
+  overlay.addEventListener("click", function(e) {
+    if (e.target === overlay) overlay.remove();
+  });
+  document.body.appendChild(overlay);
+}
+
 function teamGroupsForScreenshot(items) {
   return groupByOwner(items).sort(function(a, b) {
     var amountDiff = b.summary.total.amount - a.summary.total.amount;
@@ -1935,6 +2448,7 @@ function render() {
   document.getElementById("doneCount").textContent = "총매출 " + wonMan(summary.total.amount) + " / 목표 " + wonMan(targetAmount);
   document.getElementById("empty").style.display = items.length ? "none" : "block";
   renderOwnerCards(items);
+  renderMeetingCards(items);
 
   document.getElementById("todayTotalAmount").textContent = wonMan(teamSummary.total.amount);
   document.getElementById("todayTotalCount").textContent = teamSummary.total.count + "건";
@@ -1995,6 +2509,7 @@ function startEdit(item) {
   document.body.classList.add("view-form");
   document.body.classList.remove("view-dashboard");
   document.body.classList.remove("view-today");
+  document.body.classList.remove("view-meeting");
   document.querySelectorAll("[data-view]").forEach(function(tab) {
     tab.classList.toggle("active", tab.dataset.view === "form");
   });
@@ -2151,6 +2666,21 @@ if (confirmCopyWeeklyReportBtn) {
     });
   });
 }
+if (successCaseSaveBtn) {
+  successCaseSaveBtn.addEventListener("click", function() {
+    saveSuccessCase().catch(function(error) {
+      showNotice("성공사례 저장 실패: " + error.message, "danger");
+    });
+  });
+}
+if (successCaseCloseBtn) {
+  successCaseCloseBtn.addEventListener("click", closeSuccessCaseModal);
+}
+if (successCaseOverlay) {
+  successCaseOverlay.addEventListener("click", function(e) {
+    if (e.target === successCaseOverlay) closeSuccessCaseModal();
+  });
+}
 ownerInput.addEventListener("change", function() {
   var owner = ownerInput.value.trim();
   if (ownerNames.indexOf(owner) >= 0) {
@@ -2186,6 +2716,7 @@ document.querySelectorAll("[data-view]").forEach(function(button) {
     document.body.classList.toggle("view-form", view === "form");
     document.body.classList.toggle("view-dashboard", view === "dashboard");
     document.body.classList.toggle("view-today", view === "today");
+    document.body.classList.toggle("view-meeting", view === "meeting");
     document.querySelectorAll("[data-view]").forEach(function(tab) {
       tab.classList.toggle("active", tab.dataset.view === view);
     });
@@ -2337,7 +2868,8 @@ form.addEventListener("submit", async function(e) {
     amount: amountWon(amountInput.value),
     collectionYear: collectionYear,
     collectionMonth: collectionMonth,
-    prescriptionDone: Boolean(old.prescriptionDone)
+    prescriptionDone: Boolean(old.prescriptionDone),
+    successCase: old.successCase || ""
   };
 
   var duplicate = findDuplicateReport(item);
@@ -2372,4 +2904,5 @@ updateAmountPreview();
 loadData().catch(function(error) {
   status("연결 실패: " + error.message, "error");
 });
+
 
