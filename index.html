@@ -1337,8 +1337,15 @@
       .meeting-mini-summary-row { grid-template-columns: 82px minmax(0, 1fr); }
       .meeting-slide-kpis, .meeting-product-grid { grid-template-columns: 1fr; }
       .meeting-product-item { grid-template-columns: minmax(0, 1fr) auto; }
-      .meeting-client-item { grid-template-columns: 1fr; }
-      .meeting-client-item b { font-size: 18px; }
+      .meeting-client-item {
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: start;
+        gap: 8px;
+        padding: 8px;
+      }
+      .meeting-client-item b { font-size: 16px; line-height: 1.1; }
+      .meeting-client-side { align-content: start; padding-top: 2px; }
+      .meeting-case-btn { min-height: 28px; padding: 0 7px; font-size: 11px; }
       .presentation-overlay { padding: 8px; align-items: stretch; }
       .presentation-stage { min-height: calc(100vh - 16px); max-height: calc(100vh - 16px); padding: 22px 14px 14px; gap: 12px; border-radius: 8px; }
       .presentation-overview { grid-template-columns: 1fr; padding-right: 58px; gap: 10px; }
