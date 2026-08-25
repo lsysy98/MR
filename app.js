@@ -26,8 +26,21 @@ var openedTeamOwner = "";
 var openedReportId = "";
 var selectedMeetingOwner = "";
 var ownerFilters = {};
+var committedOwnerSearchTerm = "";
 var editingId = "";
 var ownerNames = ["성진욱", "김무영", "이승엽", "김태홍", "제성규", "송진영", "이현욱"];
+var productGroups = [
+  { group: "항생제", items: ["아목시스", "아목시클라", "세파클리"] },
+  { group: "진통제", items: ["록소리펜", "나프록소", "아세클로페낙"] },
+  { group: "소화기제", items: ["알마펜", "모사프리", "에스오메프라졸"] },
+  { group: "구강소독제", items: ["클로르 100ml", "클로르 15ml"] }
+];
+var productCategoryOrder = ["항생제", "진통제", "소화기제", "구강소독제"];
+var productRepresentativeOrder = ["항생제", "진통제", "소화기제"];
+var productOptionSet = productGroups.reduce(function(map, group) {
+  group.items.forEach(function(item) { map[item] = true; });
+  return map;
+}, {});
 
 var form = document.getElementById("reportForm");
 var appTitle = document.getElementById("appTitle");
@@ -37,9 +50,19 @@ var dateInput = document.getElementById("date");
 var clientInput = document.getElementById("client");
 var branchInput = document.getElementById("branchName");
 var productInput = document.getElementById("product");
+var productChooseBtn = document.getElementById("productChooseBtn");
+var productChooseText = document.getElementById("productChooseText");
+var productSummaryText = document.getElementById("productSummaryText");
+var productOverlay = document.getElementById("productOverlay");
+var productOptionGroups = document.getElementById("productOptionGroups");
+var productClearBtn = document.getElementById("productClearBtn");
+var productDoneBtn = document.getElementById("productDoneBtn");
 var amountInput = document.getElementById("amount");
 var amountPreview = document.getElementById("amountPreview");
 var ownerCards = document.getElementById("ownerCards");
+var ownerSearchInput = document.getElementById("ownerSearchInput");
+var ownerSearchButton = document.getElementById("ownerSearchBtn");
+var ownerSearchResults = document.getElementById("ownerSearchResults");
 var todayOwnerCards = document.getElementById("todayOwnerCards");
 var meetingCards = document.getElementById("meetingCards");
 var meetingMonthLabel = document.getElementById("meetingMonthLabel");
@@ -121,7 +144,7 @@ if (teamDatePicker) teamDatePicker.value = selectedTeamDate;
 if (teamWeekPicker) teamWeekPicker.value = selectedWeekStart;
 var savedOwnerName = localStorage.getItem("ownerName") || "";
 ownerInput.value = ownerNames.indexOf(savedOwnerName) >= 0 ? savedOwnerName : "";
-productInput.value = "클로르";
+productInput.value = "";
 var koreaHolidays = {
   "2026-01-01": true,
   "2026-02-16": true,
@@ -388,6 +411,31 @@ function collectionText(item) {
 function normalizeClientName(value) {
   return String(value || "").trim().replace(/\s+/g, " ");
 }
+function normalizeSearchText(value) {
+  return normalizeClientName(value).toLowerCase();
+}
+function currentOwnerSearchTerm() {
+  return committedOwnerSearchTerm;
+}
+function submitOwnerSearch() {
+  committedOwnerSearchTerm = normalizeSearchText(ownerSearchInput ? ownerSearchInput.value : "");
+  if (ownerSearchInput) ownerSearchInput.value = "";
+  render();
+}
+function clearCommittedOwnerSearch() {
+  if (!committedOwnerSearchTerm) return;
+  committedOwnerSearchTerm = "";
+  render();
+}
+function matchesOwnerSearch(item, term) {
+  if (!term) return true;
+  return normalizeSearchText(item.client).indexOf(term) >= 0 ||
+    normalizeSearchText(item.branchName).indexOf(term) >= 0;
+}
+function ownerSearchScopeOwner() {
+  var owner = openedOwner || currentOwnerName();
+  return ownerNames.indexOf(owner) >= 0 ? owner : "";
+}
 function findDuplicateReport(item) {
   var clientName = normalizeClientName(item.client);
   return reports.find(function(report) {
@@ -593,6 +641,156 @@ function renderCalendar() {
 function updateAmountPreview() {
   var man = amountMan(amountInput.value);
   amountPreview.textContent = man ? money.format(man) + "만원" : "1 입력 = 1만원";
+}
+function productListFromValue(value) {
+  return String(value || "")
+    .split(",")
+    .map(function(item) { return item.trim(); })
+    .filter(Boolean);
+}
+function productGroupByName(name) {
+  return productGroups.find(function(group) {
+    return group.items.indexOf(name) >= 0;
+  }) || null;
+}
+function legacyProductGroups(name) {
+  if (name === "3제+클로르") return ["항생제", "진통제", "소화기제", "구강소독제"];
+  if (name === "3제") return ["항생제", "진통제", "소화기제"];
+  if (name === "클로르") return ["구강소독제"];
+  return [];
+}
+function productGroupsFromList(list) {
+  var result = {};
+  productGroups.forEach(function(group) {
+    result[group.group] = group.items.filter(function(item) {
+      return list.indexOf(item) >= 0;
+    });
+  });
+  return result;
+}
+function productComboInfo(value) {
+  var list = productListFromValue(value);
+  var oralGroups = {};
+  var hasChlor = false;
+  list.forEach(function(product) {
+    var group = productGroupByName(product);
+    if (group) {
+      if (group.group === "구강소독제") hasChlor = true;
+      else oralGroups[group.group] = true;
+    }
+    legacyProductGroups(product).forEach(function(groupName) {
+      if (groupName === "구강소독제") hasChlor = true;
+      else oralGroups[groupName] = true;
+    });
+  });
+  var oralCount = Object.keys(oralGroups).length;
+  if (oralCount && hasChlor) return { label: oralCount + "제+클로르", key: "oralChlor", oralCount: oralCount, hasChlor: true };
+  if (oralCount) return { label: oralCount + "제", key: "oral", oralCount: oralCount, hasChlor: false };
+  if (hasChlor) return { label: "클로르", key: "chlor", oralCount: 0, hasChlor: true };
+  return { label: productDisplayText(list), key: "other", oralCount: 0, hasChlor: false };
+}
+function productShortLabel(value) {
+  var list = productListFromValue(value);
+  if (!list.length) return "";
+  var known = list.filter(function(item) { return productOptionSet[item]; });
+  var combo = productComboInfo(value);
+  if (!known.length) return combo.label || productDisplayText(list);
+
+  var grouped = productGroupsFromList(known);
+  if (combo.key === "chlor") {
+    var chlorItems = (grouped["구강소독제"] || []).map(function(item) {
+      return item.replace(/^클로르\s*/, "");
+    });
+    return combo.label + (chlorItems.length ? " · " + chlorItems.join(" / ") : "");
+  }
+  var representative = "";
+  productRepresentativeOrder.some(function(groupName) {
+    if (grouped[groupName] && grouped[groupName].length) {
+      representative = grouped[groupName][0];
+      return true;
+    }
+    return false;
+  });
+  if (!representative) representative = known[0];
+  if (representative && known.length > 1) {
+    representative += " 외 " + (known.length - 1) + "건";
+  }
+  return combo.label ? combo.label + " · " + representative : representative || productDisplayText(list);
+}
+function selectedProductList() {
+  return productListFromValue(productInput ? productInput.value : "");
+}
+function productDisplayText(list) {
+  if (!list.length) return "품목 선택";
+  if (list.length <= 2) return list.join(", ");
+  return list[0] + " 외 " + (list.length - 1) + "건";
+}
+function setProductList(list) {
+  var seen = {};
+  var next = list.filter(function(item) {
+    if (!item || seen[item]) return false;
+    seen[item] = true;
+    return true;
+  });
+  if (productInput) productInput.value = next.join(", ");
+  updateProductSelectionSummary();
+  renderProductOptions();
+}
+function updateProductSelectionSummary() {
+  var list = selectedProductList();
+  var display = list.length ? productShortLabel(list.join(", ")) : productDisplayText(list);
+  if (productChooseText) productChooseText.textContent = display;
+  if (productSummaryText) {
+    productSummaryText.textContent = list.length ? display : "등록 품목을 선택해주세요.";
+  }
+  if (productChooseBtn) productChooseBtn.classList.toggle("empty", !list.length);
+}
+function renderProductOptions() {
+  if (!productOptionGroups) return;
+  var selected = selectedProductList();
+  productOptionGroups.textContent = "";
+  productGroups.forEach(function(group) {
+    var wrap = document.createElement("div");
+    wrap.className = "product-group";
+    var title = document.createElement("div");
+    title.className = "product-group-title";
+    title.textContent = group.group;
+    var grid = document.createElement("div");
+    grid.className = "product-option-grid";
+    group.items.forEach(function(product) {
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "product-option" + (selected.indexOf(product) >= 0 ? " active" : "");
+      btn.textContent = product;
+      btn.addEventListener("click", function() {
+        toggleProductOption(product);
+      });
+      grid.appendChild(btn);
+    });
+    wrap.appendChild(title);
+    wrap.appendChild(grid);
+    productOptionGroups.appendChild(wrap);
+  });
+}
+function toggleProductOption(product) {
+  var selected = selectedProductList().filter(function(item) {
+    return productOptionSet[item];
+  });
+  var index = selected.indexOf(product);
+  if (index >= 0) selected.splice(index, 1);
+  else selected.push(product);
+  setProductList(selected);
+}
+function openProductModal() {
+  renderProductOptions();
+  if (!productOverlay) return;
+  productOverlay.classList.add("active");
+  productOverlay.setAttribute("aria-hidden", "false");
+}
+function closeProductModal() {
+  if (!productOverlay) return;
+  productOverlay.classList.remove("active");
+  productOverlay.setAttribute("aria-hidden", "true");
 }
 function updateTypeButtons() {
   document.querySelectorAll("[data-type]").forEach(function(button) {
@@ -1579,12 +1777,6 @@ function reportCard(item, index) {
   client.className = "client";
   client.textContent = item.client;
   clientWrap.appendChild(client);
-  if (item.successCase) {
-    var mark = document.createElement("span");
-    mark.className = "success-case-mark";
-    mark.textContent = "★ 성공사례";
-    clientWrap.appendChild(mark);
-  }
   if (item.branchName) {
     var branch = document.createElement("span");
     branch.className = "branch-name";
@@ -1599,7 +1791,7 @@ function reportCard(item, index) {
 
   var info = document.createElement("div");
   info.className = "report-info";
-  info.textContent = item.date + " · 수거 " + collectionMonthOf(item) + "월 · " + item.product;
+  info.textContent = item.date + " · " + productShortLabel(item.product);
 
   var bottom = document.createElement("div");
   bottom.className = "report-bottom";
@@ -1672,8 +1864,109 @@ function addDetailMetric(parent, owner, filterType, value, sub) {
   button.appendChild(small);
   parent.appendChild(button);
 }
+function renderOwnerSearchResults() {
+  if (!ownerSearchResults) return;
+  var term = currentOwnerSearchTerm();
+  ownerSearchResults.textContent = "";
+  ownerSearchResults.classList.toggle("active", !!term);
+  if (!term) return;
+
+  var scopeOwner = ownerSearchScopeOwner();
+  if (!scopeOwner) {
+    var needOwner = document.createElement("div");
+    needOwner.className = "empty";
+    needOwner.textContent = "담당자 이름을 선택하거나 담당자 카드를 연 뒤 검색해주세요.";
+    ownerSearchResults.appendChild(needOwner);
+    return;
+  }
+  var results = reports
+    .filter(function(item) {
+      if (ownerNames.indexOf(item.owner) < 0) return false;
+      if (item.owner !== scopeOwner) return false;
+      return matchesOwnerSearch(item, term);
+    })
+    .slice()
+    .sort(function(a, b) {
+      var dateDiff = String(b.date || "").localeCompare(String(a.date || ""));
+      if (dateDiff !== 0) return dateDiff;
+      return Number(b.createdAt || 0) - Number(a.createdAt || 0);
+    });
+
+  var head = document.createElement("div");
+  head.className = "owner-search-head";
+  var scope = document.createElement("span");
+  scope.textContent = scopeOwner + " · 전체 기간 검색";
+  var count = document.createElement("span");
+  count.textContent = results.length + "건";
+  head.appendChild(scope);
+  head.appendChild(count);
+  ownerSearchResults.appendChild(head);
+
+  if (!results.length) {
+    var empty = document.createElement("div");
+    empty.className = "empty";
+    empty.textContent = "검색 결과가 없습니다.";
+    ownerSearchResults.appendChild(empty);
+    return;
+  }
+
+  results.slice(0, 30).forEach(function(item) {
+    var row = document.createElement("button");
+    row.type = "button";
+    row.className = "owner-search-row";
+    row.addEventListener("click", function() {
+      selectedYear = collectionYearOf(item);
+      selectedMonth = collectionMonthOf(item);
+      openedOwner = item.owner;
+      openedReportId = item.id;
+      committedOwnerSearchTerm = "";
+      if (ownerSearchInput) ownerSearchInput.value = "";
+      syncMonthPicker();
+      render();
+      scrollOpenedOwnerIntoView(ownerCards, item.owner);
+    });
+
+    var main = document.createElement("div");
+    main.className = "owner-search-main";
+    var client = document.createElement("div");
+    client.className = "owner-search-client";
+    client.textContent = item.client;
+    main.appendChild(client);
+    if (item.branchName) {
+      var branch = document.createElement("div");
+      branch.className = "owner-search-branch";
+      branch.textContent = item.branchName;
+      main.appendChild(branch);
+    }
+
+    var meta = document.createElement("div");
+    meta.className = "owner-search-meta";
+    [item.owner, item.date, "수거 " + collectionText(item), item.type, productShortLabel(item.product)].forEach(function(text) {
+      var span = document.createElement("span");
+      span.textContent = text;
+      meta.appendChild(span);
+    });
+    main.appendChild(meta);
+
+    var amount = document.createElement("div");
+    amount.className = "owner-search-amount";
+    amount.textContent = won(item.amount);
+    row.appendChild(main);
+    row.appendChild(amount);
+    ownerSearchResults.appendChild(row);
+  });
+
+  if (results.length > 30) {
+    var more = document.createElement("div");
+    more.className = "owner-search-head";
+    more.textContent = "최근 30건만 표시합니다.";
+    ownerSearchResults.appendChild(more);
+  }
+}
 function renderOwnerCards(items) {
   ownerCards.textContent = "";
+  var searchTerm = currentOwnerSearchTerm();
+  renderOwnerSearchResults();
 
   groupByOwner(items).sort(function(a, b) {
     var rateDiff = ownerAchievementRate(b.summary.total.amount) - ownerAchievementRate(a.summary.total.amount);
@@ -1730,6 +2023,7 @@ function renderOwnerCards(items) {
     var filterType = ownerFilters[group.owner];
     group.items
       .filter(function(item) { return !filterType || item.type === filterType; })
+      .filter(function(item) { return matchesOwnerSearch(item, searchTerm); })
       .slice()
       .sort(function(a, b) { return Number(b.createdAt || 0) - Number(a.createdAt || 0); })
       .forEach(function(item, index) {
@@ -1739,7 +2033,7 @@ function renderOwnerCards(items) {
     if (!detail.children.length) {
       var empty = document.createElement("div");
       empty.className = "empty";
-      empty.textContent = "해당 구분의 거래처가 없습니다.";
+      empty.textContent = searchTerm ? "검색 결과가 없습니다." : "해당 구분의 거래처가 없습니다.";
       detail.appendChild(empty);
     }
 
@@ -1884,12 +2178,22 @@ async function saveSuccessCase() {
   showNotice("성공사례를 저장했습니다.");
 }
 function productSummary(items) {
-  var products = ["3제+클로르", "3제", "클로르"];
-  return products.map(function(product) {
-    var productItems = items.filter(function(item) { return item.product === product; });
-    var summary = summarize(productItems);
-    return { product: product, count: summary.total.count, amount: summary.total.amount };
+  var rows = [
+    { key: "oralChlor", product: "경구제+클로르", count: 0, amount: 0 },
+    { key: "oral", product: "경구제", count: 0, amount: 0 },
+    { key: "chlor", product: "클로르", count: 0, amount: 0 }
+  ];
+  var map = rows.reduce(function(result, row) {
+    result[row.key] = row;
+    return result;
+  }, {});
+  items.forEach(function(item) {
+    var info = productComboInfo(item.product);
+    if (!map[info.key]) return;
+    map[info.key].count += 1;
+    map[info.key].amount += Number(item.amount || 0);
   });
+  return rows;
 }
 function renderMeetingCards(items) {
   if (!meetingCards) return;
@@ -2012,16 +2316,15 @@ function renderMeetingCards(items) {
   var productBox = document.createElement("div");
   productBox.className = "meeting-section";
   var productTitle = document.createElement("h4");
-  productTitle.textContent = "품목별 요약";
+  productTitle.textContent = "품목군 요약";
   var productGrid = document.createElement("div");
   productGrid.className = "meeting-product-grid";
   productSummary(group.items).forEach(function(row) {
     var item = document.createElement("div");
     item.className = "meeting-product-item";
-    item.innerHTML = "<span></span><strong></strong><small></small>";
-    item.querySelector("span").textContent = row.product;
-    item.querySelector("strong").textContent = row.count + "건";
-    item.querySelector("small").textContent = won(row.amount);
+    item.innerHTML = "<span></span><strong></strong>";
+    item.querySelector("span").textContent = row.product + " · " + row.count + "건";
+    item.querySelector("strong").textContent = won(row.amount);
     productGrid.appendChild(item);
   });
   productBox.appendChild(productTitle);
@@ -2070,14 +2373,18 @@ function renderMeetingCards(items) {
       var left = document.createElement("div");
       var client = document.createElement("strong");
       client.textContent = item.client;
-      if (item.successCase) {
-        var mark = document.createElement("span");
-        mark.className = "success-case-mark";
-        mark.textContent = "★ 성공사례";
-        client.appendChild(mark);
-      }
       var info = document.createElement("small");
-      info.textContent = item.type + " · " + item.product + " · " + item.date;
+      info.className = "client-meta";
+      var typeLabel = document.createElement("span");
+      typeLabel.className = "client-type-label " + typeClass(item.type);
+      typeLabel.textContent = item.type;
+      var productLabel = document.createElement("span");
+      productLabel.textContent = productShortLabel(item.product);
+      var dateLabel = document.createElement("span");
+      dateLabel.textContent = item.date;
+      info.appendChild(typeLabel);
+      info.appendChild(productLabel);
+      info.appendChild(dateLabel);
       left.appendChild(client);
       left.appendChild(info);
       var side = document.createElement("div");
@@ -2172,29 +2479,29 @@ function openMeetingPresentation(group) {
   head.appendChild(title);
   head.appendChild(totalCard);
 
-  var metrics = document.createElement("div");
-  metrics.className = "presentation-metrics";
   var sortedByAmount = group.items
     .slice()
     .sort(function(a, b) { return Number(b.amount || 0) - Number(a.amount || 0); });
   var topClient = sortedByAmount[0] || null;
   var caseItems = group.items.filter(function(item) { return item.successCase; });
   var firstCase = caseItems[0] || null;
+  var metrics = document.createElement("div");
+  metrics.className = "presentation-metrics";
   appendPresentationMetric(metrics, "신규", group.summary.new.count + "건", wonMan(group.summary.new.amount), "count-focus");
   appendPresentationMetric(metrics, "증대", group.summary.growth.count + "건", wonMan(group.summary.growth.amount), "count-sub");
   appendPresentationMetric(metrics, "최대 거래처", topClient ? topClient.client : "-", topClient ? wonMan(topClient.amount) : "0원", "client-focus");
-  appendPresentationMetric(metrics, "성공사례", firstCase ? firstCase.client : "-", firstCase ? "작성 완료" : "미작성");
+  appendPresentationMetric(metrics, "성공사례", firstCase ? firstCase.client : "-", firstCase ? "작성 완료" : "미작성", "client-focus");
 
   var body = document.createElement("div");
   body.className = "presentation-body";
   var products = document.createElement("div");
-  products.className = "presentation-section";
+  products.className = "presentation-section presentation-products";
   var productTitle = document.createElement("h3");
   productTitle.textContent = "품목별 요약";
   products.appendChild(productTitle);
   productSummary(group.items).forEach(function(row) {
     var line = document.createElement("div");
-    line.className = "presentation-line";
+    line.className = "presentation-line presentation-product-line";
     var left = document.createElement("span");
     left.textContent = row.product + " · " + row.count + "건";
     var right = document.createElement("strong");
@@ -2214,7 +2521,7 @@ function openMeetingPresentation(group) {
       var line = document.createElement("div");
       line.className = "presentation-case";
       var client = document.createElement("strong");
-      client.textContent = "★ " + item.client;
+      client.textContent = item.client;
       var text = document.createElement("span");
       text.textContent = item.successCase;
       line.appendChild(client);
@@ -2276,7 +2583,14 @@ function openMeetingPresentation(group) {
       clientName.className = "presentation-client-name";
       clientName.textContent = item.client;
       var clientMeta = document.createElement("span");
-      clientMeta.textContent = item.type + " · " + item.product;
+      clientMeta.className = "client-meta presentation-client-meta";
+      var typeLabel = document.createElement("span");
+      typeLabel.className = "client-type-label " + typeClass(item.type);
+      typeLabel.textContent = item.type;
+      var productLabel = document.createElement("span");
+      productLabel.textContent = productShortLabel(item.product);
+      clientMeta.appendChild(typeLabel);
+      clientMeta.appendChild(productLabel);
       left.appendChild(clientName);
       left.appendChild(clientMeta);
       var right = document.createElement("strong");
@@ -2482,7 +2796,7 @@ function resetAfterSave() {
   editingId = "";
   clientInput.value = "";
   if (branchInput) branchInput.value = "";
-  productInput.value = "클로르";
+  setProductList([]);
   amountInput.value = "";
   selectedType = "신규";
   setDefaultCollectionMonth();
@@ -2495,7 +2809,7 @@ function resetFormAll() {
   editingId = "";
   clientInput.value = "";
   if (branchInput) branchInput.value = "";
-  productInput.value = "클로르";
+  setProductList([]);
   amountInput.value = "";
   setLeaveDateInput(dateInput, todayText);
   selectedType = "신규";
@@ -2510,7 +2824,9 @@ function startEdit(item) {
   setLeaveDateInput(dateInput, item.date);
   clientInput.value = item.client;
   if (branchInput) branchInput.value = item.branchName || "";
-  productInput.value = item.product;
+  productInput.value = item.product || "";
+  updateProductSelectionSummary();
+  renderProductOptions();
   amountInput.value = String(Math.round(Number(item.amount || 0) / 10000));
   selectedType = item.type;
   collectionYear = collectionYearOf(item);
@@ -2531,6 +2847,8 @@ function startEdit(item) {
 
 syncCollectionButtons();
 syncTeamPeriodControls();
+updateProductSelectionSummary();
+renderProductOptions();
 
 if (noticeOkBtn) {
   noticeOkBtn.addEventListener("click", hideNotice);
@@ -2543,6 +2861,22 @@ if (noticeActionBtn) {
 if (noticeOverlay) {
   noticeOverlay.addEventListener("click", function(e) {
     if (e.target === noticeOverlay && !noticeLocked) hideNotice();
+  });
+}
+if (productChooseBtn) {
+  productChooseBtn.addEventListener("click", openProductModal);
+}
+if (productDoneBtn) {
+  productDoneBtn.addEventListener("click", closeProductModal);
+}
+if (productClearBtn) {
+  productClearBtn.addEventListener("click", function() {
+    setProductList([]);
+  });
+}
+if (productOverlay) {
+  productOverlay.addEventListener("click", function(e) {
+    if (e.target === productOverlay) closeProductModal();
   });
 }
 if (completeDayBtn) {
@@ -2700,6 +3034,7 @@ ownerInput.addEventListener("change", function() {
     localStorage.setItem("ownerName", owner);
   }
   renderCompletionPanel();
+  render();
 });
 amountInput.addEventListener("input", function() {
   amountInput.value = digits(amountInput.value);
@@ -2745,6 +3080,24 @@ document.querySelectorAll("[data-view]").forEach(function(button) {
     window.scrollTo({ top: 0, behavior: "smooth" });
   });
 });
+if (ownerSearchInput) {
+  ownerSearchInput.addEventListener("input", function() {
+    clearCommittedOwnerSearch();
+  });
+  ownerSearchInput.addEventListener("keydown", function(e) {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      submitOwnerSearch();
+    }
+    if (e.key === "Escape") {
+      ownerSearchInput.value = "";
+      clearCommittedOwnerSearch();
+    }
+  });
+}
+if (ownerSearchButton) {
+  ownerSearchButton.addEventListener("click", submitOwnerSearch);
+}
 document.querySelectorAll("[data-period]").forEach(function(button) {
   button.addEventListener("click", function() {
     selectedTeamPeriod = button.dataset.period;
@@ -2856,7 +3209,7 @@ form.addEventListener("submit", async function(e) {
   }
   if (!productInput.value) {
     toast("품목을 선택해주세요.");
-    productInput.focus();
+    if (productChooseBtn) productChooseBtn.focus();
     return;
   }
   if (!amountWon(amountInput.value)) {
@@ -2887,7 +3240,7 @@ form.addEventListener("submit", async function(e) {
     client: clientInput.value.trim(),
     branchName: branchInput ? branchInput.value.trim() : "",
     type: selectedType,
-    product: productInput.value,
+    product: productInput.value.trim(),
     amount: amountWon(amountInput.value),
     collectionYear: collectionYear,
     collectionMonth: collectionMonth,

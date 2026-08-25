@@ -30,6 +30,9 @@ alter table public.reports
 alter table public.reports
   add column if not exists success_case text;
 
+alter table public.reports
+  drop constraint if exists reports_product_check;
+
 create index if not exists reports_report_date_idx on public.reports (report_date);
 create index if not exists reports_owner_idx on public.reports (owner);
 create index if not exists reports_collection_idx on public.reports (collection_year, collection_month);
