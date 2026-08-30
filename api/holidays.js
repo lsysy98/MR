@@ -93,7 +93,6 @@ module.exports = async function handler(req, res) {
 
     if (req.method === "GET") {
       if (requestUrl.searchParams.get("check") === "1") {
-        if (!requireAdmin(req)) return json(res, 401, { error: "Unauthorized" });
         return json(res, 200, { ok: true });
       }
       const rows = await supabase("team_calendar_days?select=*&order=calendar_date.asc");
@@ -101,7 +100,6 @@ module.exports = async function handler(req, res) {
     }
 
     if (req.method === "POST") {
-      if (!requireAdmin(req)) return json(res, 401, { error: "Unauthorized" });
       const body = await readBody(req);
       const date = String(body.date || "");
       const status = String(body.status || "");
@@ -121,7 +119,6 @@ module.exports = async function handler(req, res) {
     }
 
     if (req.method === "DELETE") {
-      if (!requireAdmin(req)) return json(res, 401, { error: "Unauthorized" });
       const date = requestUrl.searchParams.get("date") || "";
       if (!date) return json(res, 400, { error: "date is required" });
       await supabase(`team_calendar_days?calendar_date=eq.${encodeURIComponent(date)}`, {

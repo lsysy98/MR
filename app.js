@@ -12,7 +12,9 @@ var reports = [];
 var dailyCompletions = [];
 var weeklyLeaveRows = [];
 var teamCalendarDays = [];
+var exhibitionEvents = [];
 var calendarLoadError = "";
+var exhibitionLoadError = "";
 var adminKey = "";
 var completionLoadError = "";
 var selectedType = "신규";
@@ -44,7 +46,10 @@ var productOptionSet = productGroups.reduce(function(map, group) {
 
 var form = document.getElementById("reportForm");
 var appTitle = document.getElementById("appTitle");
-var holidayQuickBtn = document.getElementById("holidayQuickBtn");
+var adminMenuBtn = document.getElementById("adminMenuBtn");
+var adminMenu = document.getElementById("adminMenu");
+var menuHolidayBtn = document.getElementById("menuHolidayBtn");
+var menuExhibitionBtn = document.getElementById("menuExhibitionBtn");
 var ownerInput = document.getElementById("owner");
 var dateInput = document.getElementById("date");
 var clientInput = document.getElementById("client");
@@ -113,12 +118,40 @@ var holidayLabelInput = document.getElementById("holidayLabel");
 var holidayList = document.getElementById("holidayList");
 var holidaySaveBtn = document.getElementById("holidaySaveBtn");
 var holidayCloseBtn = document.getElementById("holidayCloseBtn");
+var exhibitionOverlay = document.getElementById("exhibitionOverlay");
+var exhibitionDateInput = document.getElementById("exhibitionDate");
+var exhibitionEndDateInput = document.getElementById("exhibitionEndDate");
+var exhibitionNameInput = document.getElementById("exhibitionName");
+var exhibitionNeededCountInput = document.getElementById("exhibitionNeededCount");
+var exhibitionRangeBtn = document.getElementById("exhibitionRangeBtn");
+var exhibitionRangeStatus = document.getElementById("exhibitionRangeStatus");
+var exhibitionWorkspace = document.getElementById("exhibitionWorkspace");
+var exhibitionEditor = document.getElementById("exhibitionEditor");
+var exhibitionActions = document.getElementById("exhibitionActions");
+var exhibitionFormToggleBtn = document.getElementById("exhibitionFormToggleBtn");
+var exhibitionAttendees = document.getElementById("exhibitionAttendees");
+var exhibitionMemoInput = document.getElementById("exhibitionMemo");
+var exhibitionList = document.getElementById("exhibitionList");
+var exhibitionOwnerStats = document.getElementById("exhibitionOwnerStats");
+var exhibitionSaveBtn = document.getElementById("exhibitionSaveBtn");
+var exhibitionResetBtn = document.getElementById("exhibitionResetBtn");
+var exhibitionCloseBtn = document.getElementById("exhibitionCloseBtn");
+var exhibitionDetailOverlay = document.getElementById("exhibitionDetailOverlay");
+var exhibitionDetailTitle = document.getElementById("exhibitionDetailTitle");
+var exhibitionDetailMeta = document.getElementById("exhibitionDetailMeta");
+var exhibitionDetailDays = document.getElementById("exhibitionDetailDays");
+var exhibitionDetailOwners = document.getElementById("exhibitionDetailOwners");
+var exhibitionDetailOwnerInfo = document.getElementById("exhibitionDetailOwnerInfo");
+var exhibitionDetailCloseBtn = document.getElementById("exhibitionDetailCloseBtn");
 var calendarOverlay = document.getElementById("calendarOverlay");
 var calendarTitle = document.getElementById("calendarTitle");
+var calendarHint = document.getElementById("calendarHint");
+var calendarActions = document.getElementById("calendarActions");
 var calendarDays = document.getElementById("calendarDays");
 var calendarPrevBtn = document.getElementById("calendarPrevBtn");
 var calendarNextBtn = document.getElementById("calendarNextBtn");
 var calendarTodayBtn = document.getElementById("calendarTodayBtn");
+var calendarConfirmBtn = document.getElementById("calendarConfirmBtn");
 var calendarCloseBtn = document.getElementById("calendarCloseBtn");
 var noticeOverlay = document.getElementById("noticeOverlay");
 var noticeText = document.getElementById("noticeText");
@@ -136,10 +169,23 @@ var noticeLocked = false;
 var noticeActionRequired = false;
 var ownerLeaveRows = [];
 var editingLeaveRangeDates = [];
+var exhibitionEditingId = "";
+var openedExhibitionId = "";
+var currentExhibitionDetailId = "";
+var selectedExhibitionDetailOwner = "";
+var selectedExhibitionStatsOwner = "";
+var exhibitionFormVisible = false;
+var exhibitionTieOrder = [];
+var exhibitionDraftSelections = {};
+var exhibitionDraftNeededCounts = {};
+var exhibitionDraftDateSet = {};
+var exhibitionCalendarDateSet = {};
 var calendarMode = "day";
 var calendarMonthDate = new Date(today.getFullYear(), today.getMonth(), 1);
 
 setLeaveDateInput(dateInput, todayText);
+setLeaveDateInput(exhibitionDateInput, "");
+setLeaveDateInput(exhibitionEndDateInput, "");
 if (teamDatePicker) teamDatePicker.value = selectedTeamDate;
 if (teamWeekPicker) teamWeekPicker.value = selectedWeekStart;
 var savedOwnerName = localStorage.getItem("ownerName") || "";
@@ -522,15 +568,75 @@ function openDatePicker(input) {
     input.click();
   }
 }
+function normalizeDateList(dates) {
+  var seen = {};
+  return (dates || [])
+    .filter(function(date) { return /^\d{4}-\d{2}-\d{2}$/.test(date); })
+    .filter(function(date) {
+      if (seen[date]) return false;
+      seen[date] = true;
+      return true;
+    })
+    .sort();
+}
+function dateSetFromList(dates) {
+  var map = {};
+  normalizeDateList(dates).forEach(function(date) {
+    map[date] = true;
+  });
+  return map;
+}
+function dateListFromSet(dateSet) {
+  return normalizeDateList(Object.keys(dateSet || {}).filter(function(date) {
+    return dateSet[date];
+  }));
+}
+function setExhibitionDates(dates) {
+  var sorted = normalizeDateList(dates);
+  exhibitionDraftDateSet = dateSetFromList(sorted);
+  setLeaveDateInput(exhibitionDateInput, sorted[0] || "");
+  setLeaveDateInput(exhibitionEndDateInput, sorted[sorted.length - 1] || "");
+  syncExhibitionDraftDates();
+}
+function setExhibitionRangeDates(startText, endText) {
+  setExhibitionDates(datesBetween(startText, endText || startText));
+}
+function exhibitionRangeDisplayText() {
+  var dates = dateListFromSet(exhibitionDraftDateSet);
+  if (!dates.length) return "";
+  if (dates.length <= 4) {
+    return dates.map(koreanDateShort).join(", ");
+  }
+  return koreanDateShort(dates[0]) + "~" + koreanDateShort(dates[dates.length - 1]) + " · " + dates.length + "일";
+}
+function updateExhibitionRangeStatus() {
+  var text = exhibitionRangeDisplayText();
+  if (exhibitionRangeStatus) {
+    exhibitionRangeStatus.innerHTML = text
+      ? "<strong>" + text + "</strong>"
+      : "전시회 날짜를 선택해주세요.";
+  }
+  if (exhibitionRangeBtn) exhibitionRangeBtn.textContent = text ? "날짜 다시 선택" : "날짜 선택";
+}
+function updateCalendarActionState() {
+  var isExhibitionPicker = calendarMode === "exhibitionRange";
+  if (calendarActions) calendarActions.classList.toggle("range-mode", isExhibitionPicker);
+  if (calendarTodayBtn) calendarTodayBtn.style.display = isExhibitionPicker ? "none" : "";
+  if (calendarConfirmBtn) calendarConfirmBtn.style.display = isExhibitionPicker ? "block" : "none";
+}
 function closeCalendar() {
   if (!calendarOverlay) return;
   calendarOverlay.classList.remove("active");
   calendarOverlay.setAttribute("aria-hidden", "true");
+  exhibitionCalendarDateSet = {};
+  updateCalendarActionState();
 }
 function openCalendar(mode, value) {
   calendarMode = mode;
+  if (mode === "exhibitionRange") exhibitionCalendarDateSet = dateSetFromList(exhibitionSelectedDates());
   var base = parseDateText(value || todayText);
   calendarMonthDate = new Date(base.getFullYear(), base.getMonth(), 1);
+  updateCalendarActionState();
   renderCalendar();
   if (calendarOverlay) {
     calendarOverlay.classList.add("active");
@@ -544,7 +650,21 @@ function selectedCalendarDateText() {
   if (calendarMode === "weeklyStart") return leaveDateValue(weeklyReportStart) || selectedTeamDate;
   if (calendarMode === "weeklyEnd") return leaveDateValue(weeklyReportEnd) || selectedTeamDate;
   if (calendarMode === "holidayDate") return leaveDateValue(holidayDateInput) || todayText;
+  if (calendarMode === "exhibitionDate") return leaveDateValue(exhibitionDateInput) || todayText;
+  if (calendarMode === "exhibitionEndDate") return leaveDateValue(exhibitionEndDateInput) || leaveDateValue(exhibitionDateInput) || todayText;
+  if (calendarMode === "exhibitionRange") return dateListFromSet(exhibitionCalendarDateSet)[0] || todayText;
   return calendarMode === "week" ? selectedWeekAnchorText() : selectedTeamDate;
+}
+function confirmExhibitionDateSelection() {
+  var dates = dateListFromSet(exhibitionCalendarDateSet);
+  if (!dates.length) {
+    showNotice("전시회 날짜를 한 개 이상 선택해주세요.", "danger");
+    return;
+  }
+  setExhibitionDates(dates);
+  renderExhibitionForm();
+  closeCalendar();
+  showNotice("설정되었습니다.");
 }
 function applyCalendarDate(selectedKey) {
   if (["formDate", "day", "weeklyStart", "weeklyEnd"].indexOf(calendarMode) >= 0 && isNonWorkingDateText(selectedKey)) {
@@ -556,6 +676,25 @@ function applyCalendarDate(selectedKey) {
     closeCalendar();
   } else if (calendarMode === "holidayDate") {
     setLeaveDateInput(holidayDateInput, selectedKey);
+    closeCalendar();
+  } else if (calendarMode === "exhibitionRange") {
+    exhibitionCalendarDateSet[selectedKey] = !exhibitionCalendarDateSet[selectedKey];
+    renderCalendar();
+  } else if (calendarMode === "exhibitionDate") {
+    setLeaveDateInput(exhibitionDateInput, selectedKey);
+    if (exhibitionEndDateInput && (!leaveDateValue(exhibitionEndDateInput) || leaveDateValue(exhibitionEndDateInput) < selectedKey)) {
+      setLeaveDateInput(exhibitionEndDateInput, selectedKey);
+    }
+    syncExhibitionDraftDates();
+    renderExhibitionForm();
+    closeCalendar();
+  } else if (calendarMode === "exhibitionEndDate") {
+    setLeaveDateInput(exhibitionEndDateInput, selectedKey);
+    if (exhibitionDateInput && leaveDateValue(exhibitionDateInput) && selectedKey < leaveDateValue(exhibitionDateInput)) {
+      setLeaveDateInput(exhibitionDateInput, selectedKey);
+    }
+    syncExhibitionDraftDates();
+    renderExhibitionForm();
     closeCalendar();
   } else if (calendarMode === "leaveStart") {
     setLeaveDateInput(leaveStartDate, selectedKey);
@@ -602,6 +741,12 @@ function renderCalendar() {
   var year = calendarMonthDate.getFullYear();
   var month = calendarMonthDate.getMonth();
   calendarTitle.textContent = year + "년 " + (month + 1) + "월";
+  if (calendarHint) {
+    var pickedCount = dateListFromSet(exhibitionCalendarDateSet).length;
+    calendarHint.textContent = calendarMode === "exhibitionRange"
+      ? "전시회 날짜를 하나씩 선택한 뒤 확인을 눌러주세요. 현재 " + pickedCount + "일 선택"
+      : "";
+  }
   calendarDays.textContent = "";
 
   var first = new Date(year, month, 1);
@@ -629,7 +774,11 @@ function renderCalendar() {
       if (isKoreanHolidayDateText(key) || isManualHolidayDateText(key)) btn.classList.add("holiday");
     }
     if (key === todayText) btn.classList.add("today");
-    if (key === selectedCalendarDateText()) btn.classList.add("selected");
+    if (calendarMode === "exhibitionRange") {
+      if (exhibitionCalendarDateSet[key]) btn.classList.add("selected");
+    } else if (key === selectedCalendarDateText()) {
+      btn.classList.add("selected");
+    }
     btn.addEventListener("click", function(selectedKey) {
       return function() {
         applyCalendarDate(selectedKey);
@@ -891,6 +1040,18 @@ async function holidayApi(method, body, query) {
   if (body) options.body = JSON.stringify(body);
   return requestJson("/api/holidays" + (query || ""), options, 8000);
 }
+async function exhibitionApi(method, body, query) {
+  var options = { method: method, headers: { "Content-Type": "application/json" } };
+  if (body) options.body = JSON.stringify(body);
+  return requestJson("/api/exhibitions" + (query || ""), options, 8000);
+}
+function exhibitionErrorMessage(error) {
+  var message = error && error.message ? error.message : String(error || "");
+  if (/exhibition_event_days|event_day_id|schema cache|relation/i.test(message)) {
+    return "전시회 날짜별 저장용 SQL이 아직 적용되지 않았습니다. 원본 Supabase SQL을 한 번 실행해주세요.";
+  }
+  return message;
+}
 async function loadCalendarDays(skipRender) {
   try {
     teamCalendarDays = await holidayApi("GET");
@@ -910,6 +1071,17 @@ async function loadCompletionsForSelectedDate(skipRender) {
     completionLoadError = error.message;
   }
   if (!skipRender) render();
+}
+async function loadExhibitions() {
+  try {
+    exhibitionEvents = await exhibitionApi("GET");
+    exhibitionLoadError = "";
+  } catch (error) {
+    exhibitionEvents = [];
+    exhibitionLoadError = error.message;
+  }
+  renderExhibitionForm();
+  renderExhibitionList();
 }
 async function loadData() {
   status("보고 데이터를 불러오는 중입니다.", "");
@@ -1662,16 +1834,6 @@ function renderHolidayList(message) {
   });
 }
 async function openHolidayAdminModal() {
-  var key = adminKey || prompt("관리자 비밀번호를 입력해주세요.");
-  if (!key) return;
-  try {
-    await holidayApi("GET", null, "?check=1&key=" + encodeURIComponent(key));
-    adminKey = key;
-  } catch (error) {
-    showNotice("관리자 비밀번호가 올바르지 않습니다.", "danger");
-    return;
-  }
-
   setLeaveDateInput(holidayDateInput, selectedTeamDate || todayText);
   if (holidayStatusInput) holidayStatusInput.value = "holiday";
   if (holidayLabelInput) holidayLabelInput.value = "";
@@ -1689,10 +1851,6 @@ function closeHolidayAdminModal() {
   holidayOverlay.setAttribute("aria-hidden", "true");
 }
 async function saveCalendarDay() {
-  if (!adminKey) {
-    showNotice("관리자 비밀번호를 먼저 입력해주세요.", "danger");
-    return;
-  }
   var date = leaveDateValue(holidayDateInput);
   var statusValue = holidayStatusInput ? holidayStatusInput.value : "holiday";
   var label = holidayLabelInput ? holidayLabelInput.value.trim() : "";
@@ -1704,7 +1862,7 @@ async function saveCalendarDay() {
     date: date,
     status: statusValue,
     label: label || calendarStatusText(statusValue)
-  }, "?key=" + encodeURIComponent(adminKey));
+  });
   await loadCalendarDays(true);
   renderHolidayList();
   renderCalendar();
@@ -1712,16 +1870,799 @@ async function saveCalendarDay() {
   showNotice("날짜 설정을 저장했습니다.");
 }
 async function deleteCalendarDay(date) {
-  if (!adminKey) {
-    showNotice("관리자 비밀번호를 먼저 입력해주세요.", "danger");
-    return;
-  }
-  await holidayApi("DELETE", null, "?date=" + encodeURIComponent(date) + "&key=" + encodeURIComponent(adminKey));
+  await holidayApi("DELETE", null, "?date=" + encodeURIComponent(date));
   await loadCalendarDays(true);
   renderHolidayList();
   renderCalendar();
   render();
   showNotice("날짜 설정을 삭제했습니다.");
+}
+function setAdminMenuOpen(open) {
+  if (!adminMenu || !adminMenuBtn) return;
+  adminMenu.classList.toggle("active", open);
+  adminMenu.setAttribute("aria-hidden", open ? "false" : "true");
+  adminMenuBtn.setAttribute("aria-expanded", open ? "true" : "false");
+}
+function closeAdminMenu() {
+  setAdminMenuOpen(false);
+}
+function normalizeEventDays(event) {
+  var days = Array.isArray(event && event.days) ? event.days.slice() : [];
+  if (!days.length && event && event.date) {
+    days = [{
+      date: event.date,
+      neededCount: event.neededCount || 2,
+      attendees: event.attendees || []
+    }];
+  }
+  return days.map(function(day) {
+    return {
+      date: day.date,
+      neededCount: Number(day.neededCount || event.neededCount || 2),
+      attendees: Array.isArray(day.attendees) ? day.attendees.filter(function(owner) {
+        return ownerNames.indexOf(owner) >= 0;
+      }) : []
+    };
+  }).filter(function(day) {
+    return /^\d{4}-\d{2}-\d{2}$/.test(day.date);
+  }).sort(function(a, b) {
+    return a.date.localeCompare(b.date);
+  });
+}
+function exhibitionDatesText(days) {
+  if (!days.length) return "";
+  if (days.length === 1) return koreanDateShort(days[0].date);
+  return koreanDateShort(days[0].date) + "~" + koreanDateShort(days[days.length - 1].date);
+}
+function exhibitionOwnersText(owners) {
+  return (owners || []).length ? owners.join(", ") : "미지정";
+}
+function exhibitionSelectedDates() {
+  var dates = dateListFromSet(exhibitionDraftDateSet);
+  if (dates.length) return dates;
+  var start = leaveDateValue(exhibitionDateInput);
+  if (!start) return [];
+  var end = leaveDateValue(exhibitionEndDateInput) || start;
+  return datesBetween(start < end ? start : end, end < start ? start : end);
+}
+function removeExhibitionDate(date) {
+  delete exhibitionDraftDateSet[date];
+  delete exhibitionDraftSelections[date];
+  delete exhibitionDraftNeededCounts[date];
+  var dates = dateListFromSet(exhibitionDraftDateSet);
+  setLeaveDateInput(exhibitionDateInput, dates[0] || "");
+  setLeaveDateInput(exhibitionEndDateInput, dates[dates.length - 1] || "");
+  syncExhibitionDraftDates();
+  renderExhibitionForm();
+}
+function setExhibitionNeededCountForDate(date, count) {
+  exhibitionDraftNeededCounts[date] = Math.max(1, Math.min(ownerNames.length, Number(count) || 2));
+  var selected = (exhibitionDraftSelections[date] || []).slice();
+  var needed = exhibitionNeededCountForDate(date);
+  if (selected.length > needed) {
+    exhibitionDraftSelections[date] = selected.slice(0, needed);
+  }
+}
+function syncExhibitionDraftDates() {
+  var dates = exhibitionSelectedDates();
+  var next = {};
+  var nextNeededCounts = {};
+  dates.forEach(function(date) {
+    next[date] = (exhibitionDraftSelections[date] || []).filter(function(owner) {
+      return ownerNames.indexOf(owner) >= 0;
+    });
+    nextNeededCounts[date] = Math.max(1, Math.min(ownerNames.length, Number(exhibitionDraftNeededCounts[date] || exhibitionNeededCountInput && exhibitionNeededCountInput.value || 2) || 2));
+  });
+  exhibitionDraftSelections = next;
+  exhibitionDraftNeededCounts = nextNeededCounts;
+}
+function exhibitionNeededCountForDate(date) {
+  return Math.max(1, Math.min(ownerNames.length, Number(exhibitionDraftNeededCounts[date] || 2) || 2));
+}
+function exhibitionDraftDays() {
+  syncExhibitionDraftDates();
+  return Object.keys(exhibitionDraftSelections).sort().map(function(date) {
+    return {
+      date: date,
+      neededCount: exhibitionNeededCountForDate(date),
+      attendees: exhibitionDraftSelections[date].slice()
+    };
+  });
+}
+function allEventAttendanceRows(skipEventId) {
+  var rows = [];
+  exhibitionEvents.forEach(function(event) {
+    if (skipEventId && event.id === skipEventId) return;
+    normalizeEventDays(event).forEach(function(day) {
+      day.attendees.forEach(function(owner) {
+        rows.push({ owner: owner, date: day.date, title: event.title || "" });
+      });
+    });
+  });
+  return rows;
+}
+function exhibitionStatsByOwner(skipEventId, draftExceptDate) {
+  var stats = {};
+  ownerNames.forEach(function(owner) {
+    stats[owner] = { owner: owner, count: 0, lastDate: "" };
+  });
+
+  allEventAttendanceRows(skipEventId).forEach(function(row) {
+    if (!stats[row.owner]) return;
+    stats[row.owner].count += 1;
+    if (!stats[row.owner].lastDate || row.date > stats[row.owner].lastDate) {
+      stats[row.owner].lastDate = row.date;
+    }
+  });
+
+  if (draftExceptDate) {
+    Object.keys(exhibitionDraftSelections).forEach(function(date) {
+      if (date === draftExceptDate) return;
+      (exhibitionDraftSelections[date] || []).forEach(function(owner) {
+        if (!stats[owner]) return;
+        stats[owner].count += 1;
+        if (!stats[owner].lastDate || date > stats[owner].lastDate) {
+          stats[owner].lastDate = date;
+        }
+      });
+    });
+  }
+
+  return stats;
+}
+function randomOwnerOrder() {
+  return ownerNames.map(function(owner) {
+    return { owner: owner, sort: Math.random() };
+  }).sort(function(a, b) {
+    return a.sort - b.sort;
+  }).map(function(item) {
+    return item.owner;
+  });
+}
+function rerollExhibitionTieOrder() {
+  exhibitionTieOrder = randomOwnerOrder();
+}
+function exhibitionTieRank(owner) {
+  var index = exhibitionTieOrder.indexOf(owner);
+  return index >= 0 ? index : ownerNames.indexOf(owner);
+}
+function exhibitionRecommendedOwnersForDate(date) {
+  var needed = exhibitionNeededCountForDate(date);
+  var stats = exhibitionStatsByOwner(exhibitionEditingId, date);
+  if (!exhibitionTieOrder.length) rerollExhibitionTieOrder();
+  return ownerNames.slice().sort(function(a, b) {
+    var aStats = stats[a];
+    var bStats = stats[b];
+    var aNever = aStats.count === 0;
+    var bNever = bStats.count === 0;
+    if (aNever !== bNever) return aNever ? -1 : 1;
+    if (aStats.lastDate !== bStats.lastDate) {
+      if (!aStats.lastDate) return -1;
+      if (!bStats.lastDate) return 1;
+      return aStats.lastDate.localeCompare(bStats.lastDate);
+    }
+    if (aStats.count !== bStats.count) return aStats.count - bStats.count;
+    return exhibitionTieRank(a) - exhibitionTieRank(b);
+  }).slice(0, needed);
+}
+function renderExhibitionOwnerCheckboxes(parent, date, selectedOwners) {
+  var selected = {};
+  (selectedOwners || []).forEach(function(owner) {
+    selected[owner] = true;
+  });
+  ownerNames.forEach(function(owner) {
+    var label = document.createElement("label");
+    label.className = "exhibition-check";
+
+    var input = document.createElement("input");
+    input.type = "checkbox";
+    input.value = owner;
+    input.checked = Boolean(selected[owner]);
+    input.addEventListener("change", function() {
+      var selectedOwners = Array.prototype.slice.call(parent.querySelectorAll("input:checked")).map(function(checked) {
+        return checked.value;
+      });
+      var needed = exhibitionNeededCountForDate(date);
+      if (selectedOwners.length > needed) {
+        input.checked = false;
+        showNotice(koreanDateShort(date) + " 참석자는 " + needed + "명까지 선택할 수 있습니다.", "danger");
+        return;
+      }
+      exhibitionDraftSelections[date] = selectedOwners;
+      renderExhibitionForm();
+    });
+
+    var span = document.createElement("span");
+    span.textContent = owner;
+
+    label.appendChild(input);
+    label.appendChild(span);
+    parent.appendChild(label);
+  });
+}
+function renderExhibitionAttendees() {
+  if (!exhibitionAttendees) return;
+  syncExhibitionDraftDates();
+  exhibitionAttendees.textContent = "";
+
+  var dates = Object.keys(exhibitionDraftSelections).sort();
+  if (!dates.length) {
+    var empty = document.createElement("div");
+    empty.className = "exhibition-empty";
+    empty.textContent = "기간 선택 버튼을 눌러 전시회 날짜를 선택해주세요.";
+    exhibitionAttendees.appendChild(empty);
+    return;
+  }
+
+  dates.forEach(function(date) {
+    var dayCard = document.createElement("div");
+    dayCard.className = "exhibition-day-card";
+
+    var head = document.createElement("div");
+    head.className = "exhibition-day-head";
+    var title = document.createElement("strong");
+    title.textContent = koreanDateShort(date);
+    var removeDateBtn = document.createElement("button");
+    removeDateBtn.type = "button";
+    removeDateBtn.className = "btn";
+    removeDateBtn.textContent = "날짜 삭제";
+    removeDateBtn.addEventListener("click", function(selectedDate) {
+      return function() {
+        removeExhibitionDate(selectedDate);
+      };
+    }(date));
+    var tools = document.createElement("div");
+    tools.className = "exhibition-day-tools";
+    var selectedCount = document.createElement("span");
+    selectedCount.textContent = "선택 " + (exhibitionDraftSelections[date] || []).length + "명 / " + exhibitionNeededCountForDate(date) + "명";
+    var neededSelect = document.createElement("select");
+    neededSelect.className = "exhibition-needed-select";
+    for (var countIndex = 1; countIndex <= ownerNames.length; countIndex += 1) {
+      var option = document.createElement("option");
+      option.value = String(countIndex);
+      option.textContent = countIndex + "명";
+      if (countIndex === exhibitionNeededCountForDate(date)) option.selected = true;
+      neededSelect.appendChild(option);
+    }
+    neededSelect.addEventListener("change", function(selectedDate) {
+      return function(e) {
+        setExhibitionNeededCountForDate(selectedDate, e.target.value);
+        renderExhibitionForm();
+      };
+    }(date));
+    tools.appendChild(selectedCount);
+    tools.appendChild(neededSelect);
+    head.appendChild(title);
+    head.appendChild(removeDateBtn);
+
+    var rec = document.createElement("div");
+    rec.className = "exhibition-recommendation";
+    var recHead = document.createElement("div");
+    recHead.className = "exhibition-rec-head";
+    var recTitle = document.createElement("strong");
+    recTitle.textContent = "추천 참석자";
+    var apply = document.createElement("button");
+    apply.type = "button";
+    apply.className = "btn";
+    apply.textContent = "추천 적용";
+    apply.addEventListener("click", function() {
+      exhibitionDraftSelections[date] = exhibitionRecommendedOwnersForDate(date);
+      renderExhibitionForm();
+    });
+    recHead.appendChild(recTitle);
+    recHead.appendChild(apply);
+    rec.appendChild(recHead);
+
+    var recList = document.createElement("div");
+    recList.className = "exhibition-rec-list";
+    var stats = exhibitionStatsByOwner(exhibitionEditingId, date);
+    exhibitionRecommendedOwnersForDate(date).forEach(function(owner) {
+      var chip = document.createElement("span");
+      chip.className = "exhibition-rec-chip";
+      chip.textContent = owner;
+      var small = document.createElement("small");
+      small.textContent = stats[owner].count ? "최근 " + koreanDateShort(stats[owner].lastDate) + " · " + stats[owner].count + "회" : "기록 없음";
+      chip.appendChild(small);
+      recList.appendChild(chip);
+    });
+    rec.appendChild(recList);
+
+    var grid = document.createElement("div");
+    grid.className = "exhibition-attendee-grid";
+    renderExhibitionOwnerCheckboxes(grid, date, exhibitionDraftSelections[date] || []);
+
+    dayCard.appendChild(head);
+    dayCard.appendChild(tools);
+    dayCard.appendChild(rec);
+    dayCard.appendChild(grid);
+    exhibitionAttendees.appendChild(dayCard);
+  });
+}
+function renderExhibitionStats() {
+  if (!exhibitionOwnerStats) return;
+  exhibitionOwnerStats.textContent = "";
+  var stats = exhibitionStatsByOwner("");
+  ownerNames.slice().sort(function(a, b) {
+    var aStats = stats[a];
+    var bStats = stats[b];
+    if (aStats.count !== bStats.count) return aStats.count - bStats.count;
+    if (aStats.lastDate !== bStats.lastDate) {
+      if (!aStats.lastDate) return -1;
+      if (!bStats.lastDate) return 1;
+      return aStats.lastDate.localeCompare(bStats.lastDate);
+    }
+    return ownerNames.indexOf(a) - ownerNames.indexOf(b);
+  }).forEach(function(owner) {
+    var row = document.createElement("div");
+    var active = selectedExhibitionStatsOwner === owner;
+    row.className = "exhibition-stat-card" + (active ? " active" : "");
+    row.tabIndex = 0;
+    row.setAttribute("role", "button");
+    row.setAttribute("aria-pressed", active ? "true" : "false");
+    var top = document.createElement("div");
+    top.className = "exhibition-stat-top";
+    var name = document.createElement("strong");
+    name.textContent = owner;
+    var count = document.createElement("b");
+    count.className = "exhibition-stat-count";
+    count.textContent = stats[owner].count + "회";
+    var recent = document.createElement("span");
+    recent.className = "exhibition-stat-recent";
+    recent.textContent = stats[owner].lastDate ? "최근 " + koreanDateShort(stats[owner].lastDate) : "참석 없음";
+    top.appendChild(name);
+    top.appendChild(count);
+    row.appendChild(top);
+    row.appendChild(recent);
+    row.addEventListener("click", function() {
+      selectedExhibitionStatsOwner = selectedExhibitionStatsOwner === owner ? "" : owner;
+      renderExhibitionStats();
+    });
+    row.addEventListener("keydown", function(e) {
+      if (e.key !== "Enter" && e.key !== " ") return;
+      e.preventDefault();
+      selectedExhibitionStatsOwner = selectedExhibitionStatsOwner === owner ? "" : owner;
+      renderExhibitionStats();
+    });
+    if (active) {
+      var eventHistory = exhibitionOwnerEventHistory(owner);
+      appendExhibitionEventHistory(row, eventHistory);
+    }
+    exhibitionOwnerStats.appendChild(row);
+  });
+}
+function setExhibitionFormVisible(visible) {
+  exhibitionFormVisible = Boolean(visible);
+  if (exhibitionWorkspace) exhibitionWorkspace.classList.toggle("form-closed", !exhibitionFormVisible);
+  if (exhibitionEditor) exhibitionEditor.classList.toggle("collapsed", !exhibitionFormVisible);
+  if (exhibitionActions) exhibitionActions.classList.toggle("collapsed", !exhibitionFormVisible);
+  if (exhibitionFormToggleBtn) {
+    exhibitionFormToggleBtn.textContent = exhibitionFormVisible ? "입력 접기" : "행사 입력";
+    exhibitionFormToggleBtn.classList.toggle("primary", !exhibitionFormVisible);
+  }
+}
+function renderExhibitionForm() {
+  updateExhibitionRangeStatus();
+  renderExhibitionAttendees();
+  renderExhibitionStats();
+  if (exhibitionSaveBtn) exhibitionSaveBtn.textContent = exhibitionEditingId ? "수정 저장" : "저장";
+}
+function resetExhibitionForm() {
+  exhibitionEditingId = "";
+  rerollExhibitionTieOrder();
+  setLeaveDateInput(exhibitionDateInput, "");
+  setLeaveDateInput(exhibitionEndDateInput, "");
+  exhibitionDraftSelections = {};
+  exhibitionDraftNeededCounts = {};
+  exhibitionDraftDateSet = {};
+  exhibitionCalendarDateSet = {};
+  if (exhibitionNameInput) exhibitionNameInput.value = "";
+  if (exhibitionNeededCountInput) exhibitionNeededCountInput.value = "2";
+  if (exhibitionMemoInput) exhibitionMemoInput.value = "";
+  syncExhibitionDraftDates();
+  renderExhibitionForm();
+  renderExhibitionList();
+}
+function exhibitionEventById(id) {
+  return exhibitionEvents.find(function(event) {
+    return event.id === id;
+  }) || null;
+}
+function exhibitionOwnerHistory(owner) {
+  var rows = [];
+  exhibitionEvents.forEach(function(event) {
+    normalizeEventDays(event).forEach(function(day) {
+      if (day.attendees.indexOf(owner) < 0) return;
+      rows.push({
+        eventId: event.id,
+        title: event.title || "전시회",
+        date: day.date
+      });
+    });
+  });
+  return rows.sort(function(a, b) {
+    return b.date.localeCompare(a.date) || b.title.localeCompare(a.title);
+  });
+}
+function exhibitionDateSpanTextFromList(dates) {
+  var list = (dates || []).slice().sort();
+  if (!list.length) return "";
+  if (list.length === 1) return koreanDateShort(list[0]);
+  return koreanDateShort(list[0]) + "~" + koreanDateShort(list[list.length - 1]);
+}
+function exhibitionOwnerEventHistory(owner) {
+  var map = {};
+  exhibitionEvents.forEach(function(event) {
+    normalizeEventDays(event).forEach(function(day) {
+      if (day.attendees.indexOf(owner) < 0) return;
+      if (!map[event.id]) {
+        map[event.id] = {
+          id: event.id,
+          title: event.title || "전시회",
+          dates: []
+        };
+      }
+      map[event.id].dates.push(day.date);
+    });
+  });
+  return Object.keys(map).map(function(id) {
+    var item = map[id];
+    item.dates = item.dates.slice().sort();
+    item.lastDate = item.dates[item.dates.length - 1] || "";
+    return item;
+  }).sort(function(a, b) {
+    return b.lastDate.localeCompare(a.lastDate) || a.title.localeCompare(b.title);
+  });
+}
+function exhibitionOwnerDaysInEvent(event, owner) {
+  return normalizeEventDays(event).filter(function(day) {
+    return day.attendees.indexOf(owner) >= 0;
+  }).map(function(day) {
+    return day.date;
+  });
+}
+function appendOwnerInfoRow(parent, label, value) {
+  var row = document.createElement("div");
+  row.className = "exhibition-owner-info-row";
+  var key = document.createElement("b");
+  key.textContent = label;
+  var val = document.createElement("span");
+  val.textContent = value;
+  row.appendChild(key);
+  row.appendChild(val);
+  parent.appendChild(row);
+}
+function appendExhibitionEventHistory(parent, eventHistory, emptyText) {
+  var history = document.createElement("div");
+  history.className = "exhibition-stat-history";
+  history.addEventListener("click", function(e) {
+    e.stopPropagation();
+  });
+  if (!eventHistory.length) {
+    var empty = document.createElement("span");
+    empty.className = "exhibition-stat-history-empty";
+    empty.textContent = emptyText || "참석 기록이 없습니다.";
+    history.appendChild(empty);
+  } else {
+    eventHistory.forEach(function(item) {
+      var historyRow = document.createElement("button");
+      historyRow.type = "button";
+      historyRow.className = "exhibition-history-row";
+      historyRow.addEventListener("click", function(e) {
+        e.stopPropagation();
+        openExhibitionDetail(item.id);
+      });
+      var eventTitle = document.createElement("b");
+      eventTitle.textContent = item.title;
+      var eventDates = document.createElement("span");
+      eventDates.textContent = exhibitionDateSpanTextFromList(item.dates);
+      historyRow.appendChild(eventTitle);
+      historyRow.appendChild(eventDates);
+      history.appendChild(historyRow);
+    });
+  }
+  parent.appendChild(history);
+}
+function renderExhibitionDetailOwnerInfo(event, owner) {
+  if (!exhibitionDetailOwnerInfo) return;
+  exhibitionDetailOwnerInfo.textContent = "";
+  if (!owner) {
+    exhibitionDetailOwnerInfo.textContent = "이름을 누르면 최근 참석 기록을 볼 수 있습니다.";
+    return;
+  }
+
+  var title = document.createElement("strong");
+  title.textContent = owner + " 참석 기록";
+  exhibitionDetailOwnerInfo.appendChild(title);
+
+  var history = exhibitionOwnerHistory(owner);
+  appendOwnerInfoRow(exhibitionDetailOwnerInfo, "최근", history.length ? koreanDateShort(history[0].date) + " · " + history[0].title : "참석 없음");
+  appendOwnerInfoRow(exhibitionDetailOwnerInfo, "누적", history.length + "회");
+  appendExhibitionEventHistory(exhibitionDetailOwnerInfo, exhibitionOwnerEventHistory(owner));
+}
+function renderExhibitionDetail() {
+  var event = exhibitionEventById(currentExhibitionDetailId);
+  if (!event) {
+    closeExhibitionDetail();
+    return;
+  }
+
+  var days = normalizeEventDays(event);
+  var totalNeeded = days.reduce(function(sum, day) {
+    return sum + Number(day.neededCount || 0);
+  }, 0);
+  var totalAttendees = days.reduce(function(sum, day) {
+    return sum + day.attendees.length;
+  }, 0);
+
+  if (exhibitionDetailTitle) exhibitionDetailTitle.textContent = event.title || "전시회";
+  if (exhibitionDetailMeta) {
+    exhibitionDetailMeta.textContent = exhibitionDatesText(days) + " · " + days.length + "일 · 참석 " + totalAttendees + "/" + totalNeeded + "명";
+  }
+
+  if (exhibitionDetailDays) {
+    exhibitionDetailDays.textContent = "";
+    days.forEach(function(day) {
+      var row = document.createElement("div");
+      row.className = "exhibition-detail-day-row";
+      var dateCell = document.createElement("div");
+      dateCell.className = "exhibition-detail-date";
+      var date = document.createElement("strong");
+      date.textContent = koreanDateShort(day.date);
+      var needed = document.createElement("small");
+      needed.textContent = day.neededCount + "명";
+      dateCell.appendChild(date);
+      dateCell.appendChild(needed);
+      var owners = document.createElement("div");
+      owners.className = "exhibition-detail-attendees";
+      if (day.attendees.length) {
+        day.attendees.forEach(function(owner) {
+          var chip = document.createElement("button");
+          chip.type = "button";
+          chip.className = "exhibition-detail-owner-chip" + (selectedExhibitionDetailOwner === owner ? " active" : "");
+          chip.textContent = owner;
+          chip.addEventListener("click", function() {
+            selectedExhibitionDetailOwner = selectedExhibitionDetailOwner === owner ? "" : owner;
+            renderExhibitionDetail();
+          });
+          owners.appendChild(chip);
+        });
+      } else {
+        var empty = document.createElement("span");
+        empty.className = "exhibition-detail-empty-name";
+        empty.textContent = "미지정";
+        owners.appendChild(empty);
+      }
+      row.appendChild(dateCell);
+      row.appendChild(owners);
+      exhibitionDetailDays.appendChild(row);
+    });
+  }
+
+  if (exhibitionDetailOwners) {
+    exhibitionDetailOwners.textContent = "";
+    ownerNames.forEach(function(owner) {
+      var button = document.createElement("button");
+      button.type = "button";
+      button.className = "exhibition-detail-owner" + (selectedExhibitionDetailOwner === owner ? " active" : "");
+
+      var name = document.createElement("strong");
+      name.textContent = owner;
+      var eventDays = exhibitionOwnerDaysInEvent(event, owner);
+      var current = document.createElement("small");
+      current.textContent = eventDays.length ? "참석 " + eventDays.map(koreanDateShort).join(", ") : "미참석";
+      var history = exhibitionOwnerHistory(owner);
+      var recent = document.createElement("small");
+      recent.textContent = history.length ? "최근 " + koreanDateShort(history[0].date) + " · " + history.length + "회" : "참석 없음";
+
+      button.appendChild(name);
+      button.appendChild(current);
+      button.appendChild(recent);
+      button.addEventListener("click", function() {
+        selectedExhibitionDetailOwner = selectedExhibitionDetailOwner === owner ? "" : owner;
+        renderExhibitionDetail();
+      });
+      exhibitionDetailOwners.appendChild(button);
+    });
+  }
+
+  renderExhibitionDetailOwnerInfo(event, selectedExhibitionDetailOwner);
+}
+function openExhibitionDetail(eventOrId) {
+  var event = typeof eventOrId === "string" ? exhibitionEventById(eventOrId) : eventOrId;
+  if (!event || !exhibitionDetailOverlay) return;
+  currentExhibitionDetailId = event.id;
+  selectedExhibitionDetailOwner = "";
+  renderExhibitionDetail();
+  exhibitionDetailOverlay.classList.add("active");
+  exhibitionDetailOverlay.setAttribute("aria-hidden", "false");
+}
+function closeExhibitionDetail() {
+  currentExhibitionDetailId = "";
+  selectedExhibitionDetailOwner = "";
+  if (!exhibitionDetailOverlay) return;
+  exhibitionDetailOverlay.classList.remove("active");
+  exhibitionDetailOverlay.setAttribute("aria-hidden", "true");
+}
+function renderExhibitionList(message) {
+  if (!exhibitionList) return;
+  exhibitionList.textContent = "";
+
+  if (message) {
+    var loading = document.createElement("div");
+    loading.className = "exhibition-empty";
+    loading.textContent = message;
+    exhibitionList.appendChild(loading);
+    return;
+  }
+
+  if (exhibitionLoadError) {
+    var error = document.createElement("div");
+    error.className = "exhibition-empty";
+    error.textContent = "목록을 불러오지 못했습니다. 전시회 SQL 실행 여부를 확인해주세요.";
+    exhibitionList.appendChild(error);
+    return;
+  }
+
+  if (!exhibitionEvents.length) {
+    var empty = document.createElement("div");
+    empty.className = "exhibition-empty";
+    empty.textContent = "저장된 전시회가 없습니다.";
+    exhibitionList.appendChild(empty);
+    return;
+  }
+
+  exhibitionEvents.slice().sort(function(a, b) {
+    return b.date.localeCompare(a.date) || b.createdAt - a.createdAt;
+  }).forEach(function(event) {
+    var item = document.createElement("div");
+    item.className = "exhibition-item"
+      + (event.id === exhibitionEditingId ? " editing" : "");
+
+    var text = document.createElement("span");
+    var title = document.createElement("span");
+    title.className = "exhibition-item-title";
+    title.textContent = event.title || "전시회";
+    text.appendChild(title);
+    var detail = document.createElement("small");
+    var days = normalizeEventDays(event);
+    var totalNeeded = days.reduce(function(sum, day) { return sum + Number(day.neededCount || 0); }, 0);
+    var totalAttendees = days.reduce(function(sum, day) { return sum + day.attendees.length; }, 0);
+    detail.textContent = exhibitionDatesText(days) + " · " + days.length + "일 · 참석 " + totalAttendees + "/" + totalNeeded + "명";
+    text.appendChild(detail);
+
+    var edit = document.createElement("button");
+    edit.type = "button";
+    edit.className = "btn";
+    edit.textContent = event.id === exhibitionEditingId ? "수정 중" : "수정";
+    edit.addEventListener("click", function(e) {
+      e.stopPropagation();
+      if (exhibitionEditingId === event.id) {
+        resetExhibitionForm();
+        setExhibitionFormVisible(false);
+        return;
+      }
+      startEditExhibition(event);
+    });
+
+    var del = document.createElement("button");
+    del.type = "button";
+    del.className = "btn danger";
+    del.textContent = "삭제";
+    del.addEventListener("click", function(e) {
+      e.stopPropagation();
+      showNotice((event.title || "전시회") + " 기록을 삭제합니다.", "danger", "삭제", function() {
+        hideNotice();
+        deleteExhibitionEvent(event.id).catch(function(error) {
+          showNotice("전시회 삭제 실패: " + error.message, "danger");
+        });
+      }, true);
+    });
+    item.addEventListener("click", function() {
+      openExhibitionDetail(event);
+    });
+
+    item.appendChild(text);
+    item.appendChild(edit);
+    item.appendChild(del);
+    exhibitionList.appendChild(item);
+  });
+}
+function startEditExhibition(event) {
+  exhibitionEditingId = event.id;
+  setExhibitionFormVisible(true);
+  var days = normalizeEventDays(event);
+  setExhibitionDates(days.map(function(day) { return day.date; }));
+  if (exhibitionNameInput) exhibitionNameInput.value = event.title || "";
+  if (exhibitionNeededCountInput) exhibitionNeededCountInput.value = String(event.neededCount || Math.max(1, (event.attendees || []).length) || 2);
+  if (exhibitionMemoInput) exhibitionMemoInput.value = event.memo || "";
+  exhibitionDraftSelections = {};
+  exhibitionDraftNeededCounts = {};
+  days.forEach(function(day) {
+    exhibitionDraftSelections[day.date] = day.attendees || [];
+    exhibitionDraftNeededCounts[day.date] = Number(day.neededCount || event.neededCount || 2);
+  });
+  syncExhibitionDraftDates();
+  renderExhibitionForm();
+  renderExhibitionList();
+}
+async function openExhibitionModal() {
+  if (exhibitionOverlay) {
+    exhibitionOverlay.classList.add("active");
+    exhibitionOverlay.setAttribute("aria-hidden", "false");
+  }
+  selectedExhibitionStatsOwner = "";
+  setExhibitionFormVisible(false);
+  rerollExhibitionTieOrder();
+  syncExhibitionDraftDates();
+  renderExhibitionForm();
+  renderExhibitionList("목록을 불러오는 중입니다.");
+  await loadExhibitions();
+}
+function closeExhibitionModal() {
+  if (!exhibitionOverlay) return;
+  closeExhibitionDetail();
+  exhibitionOverlay.classList.remove("active");
+  exhibitionOverlay.setAttribute("aria-hidden", "true");
+}
+async function saveExhibitionEvent() {
+  var date = leaveDateValue(exhibitionDateInput);
+  var title = exhibitionNameInput ? exhibitionNameInput.value.trim() : "";
+  var days = exhibitionDraftDays();
+  if (!date) {
+    showNotice("전시회 기간을 선택해주세요.", "danger");
+    return;
+  }
+  if (!title) {
+    showNotice("행사명을 입력해주세요.", "danger");
+    if (exhibitionNameInput) exhibitionNameInput.focus();
+    return;
+  }
+  if (!days.length) {
+    showNotice("전시회 날짜를 한 개 이상 선택해주세요.", "danger");
+    return;
+  }
+  if (!days.some(function(day) { return day.attendees.length; })) {
+    showNotice("날짜별 참석자를 한 명 이상 선택해주세요.", "danger");
+    return;
+  }
+
+  var saved = await exhibitionApi("POST", {
+    id: exhibitionEditingId,
+    date: days[0].date,
+    title: title,
+    neededCount: days[0].neededCount || 2,
+    days: days,
+    memo: exhibitionMemoInput ? exhibitionMemoInput.value.trim() : ""
+  });
+
+  var found = false;
+  exhibitionEvents = exhibitionEvents.map(function(event) {
+    if (event.id === saved.id) {
+      found = true;
+      return saved;
+    }
+    return event;
+  });
+  if (!found) exhibitionEvents.unshift(saved);
+  resetExhibitionForm();
+  setExhibitionFormVisible(false);
+  renderExhibitionList();
+  showNotice("전시회 참석 기록을 저장했습니다.");
+}
+async function deleteExhibitionEvent(id) {
+  await exhibitionApi("DELETE", null, "?id=" + encodeURIComponent(id));
+  exhibitionEvents = exhibitionEvents.filter(function(event) {
+    return event.id !== id;
+  });
+  var wasEditing = exhibitionEditingId === id;
+  if (wasEditing) {
+    resetExhibitionForm();
+    setExhibitionFormVisible(false);
+  }
+  if (currentExhibitionDetailId === id) closeExhibitionDetail();
+  renderExhibitionForm();
+  renderExhibitionList();
+  showNotice("전시회 기록을 삭제했습니다.");
 }
 function groupByOwner(items) {
   var map = {};
@@ -2943,6 +3884,55 @@ if (holidayOverlay) {
     if (e.target === holidayOverlay) closeHolidayAdminModal();
   });
 }
+if (exhibitionDateInput) {
+  exhibitionDateInput.addEventListener("click", function() {
+    openCalendar("exhibitionDate", leaveDateValue(exhibitionDateInput) || todayText);
+  });
+}
+if (exhibitionEndDateInput) {
+  exhibitionEndDateInput.addEventListener("click", function() {
+    openCalendar("exhibitionEndDate", leaveDateValue(exhibitionEndDateInput) || leaveDateValue(exhibitionDateInput) || todayText);
+  });
+}
+if (exhibitionRangeBtn) {
+  exhibitionRangeBtn.addEventListener("click", function() {
+    openCalendar("exhibitionRange", leaveDateValue(exhibitionDateInput) || todayText);
+  });
+}
+if (exhibitionNeededCountInput) {
+  exhibitionNeededCountInput.addEventListener("change", renderExhibitionForm);
+}
+if (exhibitionFormToggleBtn) {
+  exhibitionFormToggleBtn.addEventListener("click", function() {
+    setExhibitionFormVisible(!exhibitionFormVisible);
+  });
+}
+if (exhibitionSaveBtn) {
+  exhibitionSaveBtn.addEventListener("click", function() {
+    saveExhibitionEvent().catch(function(error) {
+      showNotice("전시회 저장 실패: " + exhibitionErrorMessage(error), "danger");
+    });
+  });
+}
+if (exhibitionResetBtn) {
+  exhibitionResetBtn.addEventListener("click", resetExhibitionForm);
+}
+if (exhibitionCloseBtn) {
+  exhibitionCloseBtn.addEventListener("click", closeExhibitionModal);
+}
+if (exhibitionOverlay) {
+  exhibitionOverlay.addEventListener("click", function(e) {
+    if (e.target === exhibitionOverlay) closeExhibitionModal();
+  });
+}
+if (exhibitionDetailCloseBtn) {
+  exhibitionDetailCloseBtn.addEventListener("click", closeExhibitionDetail);
+}
+if (exhibitionDetailOverlay) {
+  exhibitionDetailOverlay.addEventListener("click", function(e) {
+    if (e.target === exhibitionDetailOverlay) closeExhibitionDetail();
+  });
+}
 if (appTitle) {
   var titlePressTimer = null;
   var titlePressFired = false;
@@ -2967,13 +3957,33 @@ if (appTitle) {
     if (titlePressFired) e.preventDefault();
   });
 }
-if (holidayQuickBtn) {
-  holidayQuickBtn.addEventListener("click", function() {
+if (adminMenuBtn) {
+  adminMenuBtn.addEventListener("click", function(e) {
+    e.stopPropagation();
+    setAdminMenuOpen(!(adminMenu && adminMenu.classList.contains("active")));
+  });
+}
+if (menuHolidayBtn) {
+  menuHolidayBtn.addEventListener("click", function() {
+    closeAdminMenu();
     openHolidayAdminModal().catch(function(error) {
       showNotice("휴일 설정 열기 실패: " + error.message, "danger");
     });
   });
 }
+if (menuExhibitionBtn) {
+  menuExhibitionBtn.addEventListener("click", function() {
+    closeAdminMenu();
+    openExhibitionModal().catch(function(error) {
+      showNotice("전시회 참석 열기 실패: " + error.message, "danger");
+    });
+  });
+}
+document.addEventListener("click", function(e) {
+  if (!adminMenu || !adminMenu.classList.contains("active")) return;
+  if (e.target && e.target.closest && e.target.closest(".admin-menu-wrap")) return;
+  closeAdminMenu();
+});
 if (dayScreenshotBtn) {
   dayScreenshotBtn.addEventListener("click", downloadResolvedScreenshot);
 }
@@ -3169,6 +4179,13 @@ if (calendarNextBtn) {
 if (calendarTodayBtn) {
   calendarTodayBtn.addEventListener("click", function() {
     applyCalendarDate(todayText);
+  });
+}
+if (calendarConfirmBtn) {
+  calendarConfirmBtn.addEventListener("click", function() {
+    if (calendarMode === "exhibitionRange") {
+      confirmExhibitionDateSelection();
+    }
   });
 }
 if (calendarCloseBtn) {

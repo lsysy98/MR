@@ -29,6 +29,12 @@
     header { background: rgba(255,255,255,.96); border-bottom: 1px solid var(--line); padding: 14px 16px; position: sticky; top: 0; z-index: 5; box-shadow: 0 2px 14px rgba(120, 74, 36, .06); }
     .header-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
     h1 { margin: 0; font-size: 19px; user-select: none; }
+    .admin-menu-wrap {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+    }
     .header-settings {
       min-height: 34px;
       border: 1px solid #efc7ad;
@@ -41,6 +47,52 @@
       cursor: pointer;
       white-space: nowrap;
     }
+    .header-menu-toggle {
+      width: 42px;
+      padding: 0;
+      display: inline-flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      font-size: 0;
+      line-height: 1;
+    }
+    .menu-bar {
+      display: block;
+      width: 18px;
+      height: 2px;
+      border-radius: 999px;
+      background: #c64e13;
+    }
+    .admin-menu {
+      position: absolute;
+      top: calc(100% + 8px);
+      right: 0;
+      z-index: 30;
+      width: 150px;
+      display: none;
+      gap: 5px;
+      padding: 7px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      box-shadow: 0 14px 30px rgba(95, 58, 27, .16);
+    }
+    .admin-menu.active { display: grid; }
+    .admin-menu button {
+      min-height: 36px;
+      border: 0;
+      border-radius: 7px;
+      background: transparent;
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 900;
+      text-align: left;
+      padding: 0 10px;
+      cursor: pointer;
+    }
+    .admin-menu button:hover { background: #fff0e6; color: #c64e13; }
     h2 { margin: 0; font-size: 17px; }
     button, input, select { font: inherit; }
     main { max-width: 1120px; margin: 0 auto; padding: 14px; display: grid; grid-template-columns: 360px 1fr; gap: 14px; }
@@ -196,7 +248,7 @@
       background: #c24141;
       border-color: #c24141;
     }
-    .leave-overlay, .holiday-overlay {
+    .leave-overlay, .holiday-overlay, .exhibition-overlay, .exhibition-detail-overlay {
       position: fixed;
       inset: 0;
       z-index: 50;
@@ -206,8 +258,8 @@
       padding: 18px;
       background: rgba(23, 33, 28, .28);
     }
-    .leave-overlay.active, .holiday-overlay.active { display: flex; }
-    .leave-box, .holiday-box {
+    .leave-overlay.active, .holiday-overlay.active, .exhibition-overlay.active, .exhibition-detail-overlay.active { display: flex; }
+    .leave-box, .holiday-box, .exhibition-box, .exhibition-detail-box {
       width: min(360px, 100%);
       display: grid;
       gap: 12px;
@@ -217,16 +269,92 @@
       border-radius: 8px;
       box-shadow: 0 18px 44px rgba(27,45,37,.22);
     }
-    .leave-box h3, .holiday-box h3 { margin: 0; font-size: 17px; }
-    .leave-box p, .holiday-box p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.45; }
-    .leave-grid, .holiday-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-    .holiday-grid.single { grid-template-columns: 1fr; }
-    .leave-actions, .holiday-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-    .leave-actions .wide, .holiday-actions .wide { grid-column: 1 / -1; }
-    .leave-list-wrap, .holiday-list-wrap { display: grid; gap: 8px; border-top: 1px solid var(--line); padding-top: 10px; }
-    .leave-list-title, .holiday-list-title { font-size: 13px; font-weight: 900; color: var(--muted); }
-    .leave-list, .holiday-list { display: grid; gap: 6px; max-height: 190px; overflow: auto; }
-    .leave-item, .holiday-item {
+    .exhibition-box {
+      width: min(940px, calc(100vw - 36px));
+      max-height: calc(100vh - 36px);
+      overflow: auto;
+      background: #fffaf6;
+      border-color: #efc7ad;
+    }
+    .exhibition-detail-overlay { z-index: 70; }
+    .exhibition-detail-box {
+      width: min(780px, calc(100vw - 36px));
+      max-height: calc(100vh - 36px);
+      overflow: auto;
+      background: #fffaf6;
+      border-color: #efc7ad;
+    }
+    .leave-box h3, .holiday-box h3, .exhibition-box h3, .exhibition-detail-box h3 { margin: 0; font-size: 17px; }
+    #exhibitionTitle {
+      font-size: 21px;
+      letter-spacing: 0;
+    }
+    #exhibitionTitle + p { padding-bottom: 2px; }
+    .leave-box p, .holiday-box p, .exhibition-box p, .exhibition-detail-box p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.45; }
+    .exhibition-workspace {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 320px;
+      gap: 14px;
+      align-items: start;
+    }
+    .exhibition-workspace.form-closed {
+      grid-template-columns: 1fr;
+    }
+    .exhibition-workspace.form-closed .exhibition-side {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      align-items: start;
+    }
+    .exhibition-editor, .exhibition-side, .exhibition-form-block, .exhibition-day-card, .exhibition-item {
+      min-width: 0;
+    }
+    .exhibition-editor, .exhibition-side {
+      display: grid;
+      gap: 10px;
+    }
+    .exhibition-editor.collapsed, .exhibition-actions.collapsed {
+      display: none;
+    }
+    .exhibition-top-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      padding-top: 2px;
+    }
+    .exhibition-top-actions .btn {
+      min-height: 38px;
+      padding: 0 14px;
+      font-weight: 900;
+    }
+    .exhibition-form-block {
+      display: grid;
+      gap: 10px;
+      padding: 14px;
+      border: 1px solid #f0d7c4;
+      border-radius: 8px;
+      background: #fff;
+      box-shadow: 0 8px 20px rgba(95, 58, 27, .05);
+    }
+    .exhibition-form-block-title {
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 900;
+    }
+    .leave-grid, .holiday-grid, .exhibition-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .holiday-grid.single, .exhibition-grid.single { grid-template-columns: 1fr; }
+    .leave-actions, .holiday-actions, .exhibition-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .leave-actions .wide, .holiday-actions .wide, .exhibition-actions .wide { grid-column: 1 / -1; }
+    .leave-list-wrap, .holiday-list-wrap, .exhibition-list-wrap { display: grid; gap: 8px; border-top: 1px solid var(--line); padding-top: 10px; }
+    .exhibition-list-wrap {
+      border: 1px solid #f0d7c4;
+      border-radius: 8px;
+      padding: 12px;
+      background: #fff;
+      box-shadow: 0 8px 20px rgba(95, 58, 27, .05);
+    }
+    .leave-list-title, .holiday-list-title, .exhibition-list-title { font-size: 13px; font-weight: 900; color: var(--muted); }
+    .leave-list, .holiday-list, .exhibition-list { display: grid; gap: 6px; max-height: 190px; overflow: auto; }
+    .exhibition-list { max-height: 240px; }
+    .leave-item, .holiday-item, .exhibition-item {
       display: grid;
       grid-template-columns: 1fr auto auto;
       gap: 6px;
@@ -235,6 +363,251 @@
       border: 1px solid var(--line);
       border-radius: 8px;
       background: #fbfdfc;
+    }
+    .exhibition-item {
+      cursor: pointer;
+      align-items: start;
+      background: #fff;
+    }
+    .exhibition-item.open {
+      border-color: #f0b485;
+      background: #fffaf6;
+    }
+    .exhibition-item .exhibition-item-title {
+      color: var(--text);
+      font-size: 14px;
+      font-weight: 900;
+      line-height: 1.35;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .exhibition-item > span { min-width: 0; }
+    .exhibition-item-detail {
+      grid-column: 1 / -1;
+      display: grid;
+      gap: 6px;
+      padding-top: 8px;
+      border-top: 1px solid #f0e0d3;
+    }
+    .exhibition-detail-day {
+      display: grid;
+      grid-template-columns: 74px 1fr;
+      gap: 8px;
+      padding: 7px 8px;
+      border-radius: 8px;
+      background: #fff;
+      border: 1px solid #f1dfd0;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+    .exhibition-detail-day strong {
+      color: #c64e13;
+      font-size: 12px;
+      font-weight: 900;
+    }
+    .exhibition-detail-day span {
+      color: var(--text);
+      font-weight: 800;
+    }
+    .exhibition-detail-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      border-bottom: 1px solid #f0ded1;
+      padding-bottom: 10px;
+    }
+    .exhibition-detail-head .btn {
+      min-height: 34px;
+      padding: 0 12px;
+      white-space: nowrap;
+    }
+    .exhibition-detail-meta {
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 800;
+      line-height: 1.45;
+    }
+    .exhibition-detail-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1.05fr) minmax(260px, .95fr);
+      gap: 12px;
+      align-items: start;
+    }
+    .exhibition-detail-section {
+      display: grid;
+      gap: 8px;
+      padding: 12px;
+      border: 1px solid #f0d7c4;
+      border-radius: 8px;
+      background: #fff;
+      box-shadow: 0 8px 20px rgba(95, 58, 27, .05);
+      min-width: 0;
+    }
+    .exhibition-detail-section h4 {
+      margin: 0;
+      color: var(--text);
+      font-size: 14px;
+      font-weight: 900;
+    }
+    .exhibition-detail-days, .exhibition-detail-owners {
+      display: grid;
+      gap: 8px;
+      min-width: 0;
+    }
+    .exhibition-detail-day-row {
+      display: grid;
+      grid-template-columns: 86px minmax(0, 1fr);
+      gap: 12px;
+      align-items: start;
+      padding: 12px;
+      border: 1px solid #f2d3bc;
+      border-radius: 8px;
+      background: linear-gradient(90deg, #fff8f2 0%, #fff 46%);
+      box-shadow: 0 5px 14px rgba(95, 58, 27, .05);
+    }
+    .exhibition-detail-date {
+      display: grid;
+      gap: 5px;
+      align-content: start;
+      min-width: 0;
+    }
+    .exhibition-detail-date strong {
+      color: #c64e13;
+      font-size: 14px;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+    .exhibition-detail-date small {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: fit-content;
+      min-height: 28px;
+      padding: 0 9px;
+      border-radius: 999px;
+      background: #fff0e6;
+      color: #c64e13;
+      font-size: 12px;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+    .exhibition-detail-day-row span {
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 800;
+      line-height: 1.45;
+      word-break: keep-all;
+    }
+    .exhibition-detail-attendees {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 7px;
+      min-width: 0;
+      padding-top: 1px;
+    }
+    .exhibition-detail-owner-chip {
+      min-height: 30px;
+      border: 1px solid #efc7ad;
+      border-radius: 999px;
+      background: #fff;
+      color: #382f28;
+      padding: 0 12px;
+      font-size: 13px;
+      font-weight: 900;
+      cursor: pointer;
+      white-space: nowrap;
+      word-break: keep-all;
+      box-shadow: 0 2px 6px rgba(95, 58, 27, .05);
+    }
+    .exhibition-detail-owner-chip.active {
+      border-color: var(--green);
+      background: var(--green);
+      color: #fff;
+      box-shadow: 0 5px 12px rgba(240, 100, 24, .24);
+    }
+    .exhibition-detail-empty-name {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+    }
+    .exhibition-detail-owner-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+    .exhibition-detail-owner {
+      display: grid;
+      gap: 4px;
+      padding: 10px;
+      border: 1px solid #f0d7c4;
+      border-radius: 8px;
+      background: #fff;
+      color: var(--text);
+      font: inherit;
+      text-align: left;
+      cursor: pointer;
+    }
+    .exhibition-detail-owner.active {
+      border-color: #f0b485;
+      background: #fff3e8;
+      box-shadow: inset 4px 0 0 var(--green);
+    }
+    .exhibition-detail-owner strong {
+      font-size: 14px;
+      font-weight: 900;
+      white-space: nowrap;
+      word-break: keep-all;
+    }
+    .exhibition-detail-owner small {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 800;
+      line-height: 1.35;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .exhibition-owner-info {
+      display: grid;
+      gap: 8px;
+      padding: 10px;
+      border: 1px dashed #efc7ad;
+      border-radius: 8px;
+      background: #fff8f2;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 800;
+      line-height: 1.45;
+      min-height: 74px;
+    }
+    .exhibition-owner-info strong {
+      color: var(--text);
+      font-size: 14px;
+      font-weight: 900;
+    }
+    .exhibition-owner-info-row {
+      display: grid;
+      grid-template-columns: 72px minmax(0, 1fr);
+      gap: 8px;
+      color: var(--text);
+    }
+    .exhibition-owner-info-row b {
+      color: #c64e13;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+    .exhibition-owner-history {
+      display: grid;
+      gap: 5px;
+      padding-top: 4px;
+    }
+    .exhibition-item.editing {
+      border-color: var(--green);
+      background: var(--green-soft);
+      box-shadow: inset 4px 0 0 var(--green);
     }
     .leave-item.editing {
       border-color: var(--green);
@@ -248,10 +621,254 @@
       font-size: 12px;
       font-weight: 900;
     }
-    .leave-item span, .holiday-item span { font-size: 13px; font-weight: 800; }
-    .holiday-item small { display: block; margin-top: 2px; color: var(--muted); font-size: 12px; font-weight: 700; }
-    .leave-item .btn, .holiday-item .btn { min-height: 34px; padding: 0 9px; font-size: 12px; }
-    .leave-empty, .holiday-empty { color: var(--muted); font-size: 13px; padding: 8px; border: 1px dashed var(--line); border-radius: 8px; }
+    .leave-item span, .holiday-item span, .exhibition-item span { font-size: 13px; font-weight: 800; }
+    .holiday-item small, .exhibition-item small { display: block; margin-top: 2px; color: var(--muted); font-size: 12px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .leave-item .btn, .holiday-item .btn, .exhibition-item .btn { min-height: 34px; padding: 0 9px; font-size: 12px; }
+    .leave-empty, .holiday-empty, .exhibition-empty { color: var(--muted); font-size: 13px; padding: 8px; border: 1px dashed var(--line); border-radius: 8px; }
+    .exhibition-range-panel {
+      display: grid;
+      gap: 8px;
+      padding: 12px;
+      border: 1px solid #f2d8c6;
+      border-radius: 8px;
+      background: #fffaf6;
+    }
+    .exhibition-range-panel .btn { width: 100%; justify-content: center; }
+    .exhibition-range-status {
+      min-height: 22px;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 800;
+      line-height: 1.45;
+    }
+    .exhibition-range-status strong {
+      color: var(--text);
+      font-weight: 900;
+    }
+    .exhibition-day-list {
+      display: grid;
+      gap: 9px;
+    }
+    .exhibition-day-card {
+      display: grid;
+      gap: 9px;
+      padding: 12px;
+      border: 1px solid #eaded4;
+      border-radius: 8px;
+      background: linear-gradient(180deg, #fff 0%, #fffaf6 100%);
+    }
+    .exhibition-day-head {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: 8px;
+    }
+    .exhibition-day-head strong { font-size: 14px; }
+    .exhibition-day-tools {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 7px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+    .exhibition-day-tools .btn {
+      min-height: 34px;
+      padding: 0 9px;
+      font-size: 12px;
+    }
+    .exhibition-needed-select {
+      width: auto;
+      min-height: 34px;
+      padding: 0 28px 0 10px;
+      font-size: 13px;
+      font-weight: 900;
+    }
+    .exhibition-stats {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 7px;
+    }
+    .exhibition-stat-card {
+      display: grid;
+      gap: 7px;
+      padding: 10px 11px;
+      border: 1px solid #efd2bd;
+      border-radius: 8px;
+      background: #fff;
+      cursor: pointer;
+      transition: background .16s ease, border-color .16s ease, box-shadow .16s ease, transform .16s ease;
+    }
+    .exhibition-stat-card:hover {
+      border-color: #f0b485;
+      box-shadow: 0 8px 18px rgba(95, 58, 27, .08);
+      transform: translateY(-1px);
+    }
+    .exhibition-stat-card.active {
+      border-color: #f06418;
+      background: #fff4ea;
+      box-shadow: inset 4px 0 0 #f06418, 0 10px 20px rgba(95, 58, 27, .08);
+    }
+    .exhibition-stat-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .exhibition-stat-top strong {
+      min-width: 0;
+      font-size: 14px;
+      font-weight: 900;
+      white-space: nowrap;
+      word-break: keep-all;
+    }
+    .exhibition-stat-count {
+      min-width: 38px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: #fff0e6;
+      color: #c64e13;
+      text-align: center;
+      font-size: 12px;
+      font-weight: 900;
+    }
+    .exhibition-stat-recent {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 800;
+      line-height: 1.35;
+    }
+    .exhibition-stat-card:first-child {
+      border-color: #efd2bd;
+      background: #fff;
+    }
+    .exhibition-stat-card:first-child.active {
+      border-color: #f06418;
+      background: #fff4ea;
+    }
+    .exhibition-stat-history {
+      display: grid;
+      gap: 5px;
+      padding-top: 7px;
+      border-top: 1px solid #f2d8c6;
+    }
+    .exhibition-history-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 8px;
+      align-items: center;
+      width: 100%;
+      padding: 6px 7px;
+      border: 0;
+      border-radius: 7px;
+      background: rgba(255,255,255,.82);
+      color: var(--text);
+      font-size: 12px;
+      line-height: 1.35;
+      font-family: inherit;
+      text-align: left;
+      cursor: pointer;
+    }
+    .exhibition-history-row:hover { background: #fff0e6; }
+    .exhibition-history-row b {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-weight: 900;
+    }
+    .exhibition-history-row span {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+    .exhibition-stat-history-empty {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+      padding: 4px 0;
+    }
+    .exhibition-attendee-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 7px;
+    }
+    .exhibition-check {
+      min-height: 38px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      border: 1px solid #e5d4c6;
+      border-radius: 8px;
+      background: #fffaf6;
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 900;
+      cursor: pointer;
+      min-width: 0;
+      white-space: nowrap;
+      word-break: keep-all;
+    }
+    .exhibition-check span {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      word-break: keep-all;
+    }
+    .exhibition-check input {
+      width: auto;
+      min-height: 0;
+      margin: 0;
+      padding: 0;
+      border: 0;
+      accent-color: var(--green);
+    }
+    .exhibition-check:has(input:checked) {
+      background: var(--green);
+      border-color: var(--green);
+      color: #fff;
+    }
+    .exhibition-recommendation {
+      display: grid;
+      gap: 8px;
+      padding: 10px;
+      border: 1px solid #f2d8c6;
+      border-radius: 8px;
+      background: #fff8f2;
+    }
+    .exhibition-rec-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .exhibition-rec-head strong { font-size: 13px; }
+    .exhibition-rec-list { display: flex; flex-wrap: wrap; gap: 6px; }
+    .exhibition-rec-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      min-height: 28px;
+      padding: 0 8px;
+      border-radius: 999px;
+      background: #fff;
+      border: 1px solid #efc7ad;
+      font-size: 12px;
+      font-weight: 900;
+      white-space: nowrap;
+      word-break: keep-all;
+    }
+    .exhibition-rec-chip small { color: var(--muted); font-size: 11px; font-weight: 800; white-space: nowrap; }
+    .exhibition-memo {
+      width: 100%;
+      min-height: 74px;
+      resize: vertical;
+      border: 1px solid #e5d4c6;
+      border-radius: 8px;
+      padding: 10px 12px;
+      font: inherit;
+      color: var(--text);
+    }
     .notice-actions { display: grid; grid-template-columns: 1fr; gap: 8px; }
     .notice-actions.has-action { grid-template-columns: 1fr 1fr; }
     #noticeActionBtn { display: none; }
@@ -278,9 +895,12 @@
     }
     .calendar-head { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: center; }
     .calendar-head strong { text-align: center; font-size: 16px; }
+    .calendar-hint { color: var(--muted); font-size: 13px; font-weight: 800; text-align: center; line-height: 1.45; }
     .calendar-weekdays, .calendar-days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
     .calendar-weekdays span { color: var(--muted); font-size: 12px; font-weight: 900; text-align: center; }
     .calendar-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .calendar-actions.range-mode { grid-template-columns: 1fr 1fr; }
+    #calendarConfirmBtn { display: none; }
     .calendar-day {
       min-height: 38px;
       border: 1px solid var(--line);
@@ -295,6 +915,8 @@
     .calendar-day.holiday, .calendar-day.weekend { background: #fff1f1; border-color: #efc8c8; color: #c24141; }
     .calendar-day.workday { background: #ecf9f3; border-color: #98d8bf; color: #0f5b47; }
     .calendar-day.today { border-color: var(--green); }
+    .calendar-day.in-range { background: #fff0e6; border-color: #f3c5a4; color: #c64e13; }
+    .calendar-day.range-start, .calendar-day.range-end { background: var(--green); border-color: var(--green); color: #fff; }
     .calendar-day.selected { background: var(--green); border-color: var(--green); color: #fff; }
     .status { border: 1px solid #cbd8d1; border-radius: 8px; padding: 10px 12px; background: #fbfdfc; color: var(--muted); font-size: 13px; }
     .status.ok { border-color: #98d8bf; background: #ecf9f3; color: #0f5b47; }
@@ -647,6 +1269,8 @@
     @media (max-width: 900px) {
       header { padding: 12px 12px 10px; }
       .header-settings { min-height: 32px; padding: 0 9px; font-size: 12px; }
+      .header-menu-toggle { width: 38px; padding: 0; }
+      .admin-menu { width: 142px; }
       .mobile-tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 10px; padding: 4px; border: 1px solid #e5d4c6; border-radius: 8px; background: #fff7f0; }
       .mobile-tab { min-height: 38px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); font-weight: 800; cursor: pointer; }
       .mobile-tab.active { background: var(--green); color: #fff; }
@@ -676,6 +1300,20 @@
       .date-label, .week-label { min-height: 40px; padding: 0 6px; font-size: 12px; font-weight: 700; letter-spacing: 0; }
       .completion-actions { display: grid; grid-template-columns: 1fr 1fr; }
       .completion-actions .btn { padding: 0 8px; }
+      .exhibition-box { padding: 16px; }
+      .exhibition-detail-box { width: min(720px, calc(100vw - 24px)); padding: 16px; }
+      .exhibition-detail-layout { grid-template-columns: 1fr; }
+      .exhibition-detail-day-row { grid-template-columns: 1fr; gap: 5px; }
+      .exhibition-detail-owner-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .exhibition-workspace { grid-template-columns: 1fr; }
+      .exhibition-workspace.form-closed .exhibition-side { grid-template-columns: 1fr; }
+      .exhibition-grid { grid-template-columns: 1fr; }
+      .exhibition-day-head { grid-template-columns: 1fr auto; align-items: center; }
+      .exhibition-attendee-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .exhibition-stats { grid-template-columns: 1fr; }
+      .exhibition-item { grid-template-columns: 1fr auto; }
+      .exhibition-item .btn.danger { grid-column: 2; }
+      .exhibition-detail-day { grid-template-columns: 68px 1fr; }
       .owner-detail-summary { grid-template-columns: 1fr 1fr; }
       .detail-reset { grid-column: 1 / -1; }
       .report-card { padding: 8px 8px 8px 40px; }
@@ -1392,7 +2030,17 @@
   <header>
     <div class="header-top">
       <h1 id="appTitle">MR수도권팀 일일보고</h1>
-      <button class="header-settings" type="button" id="holidayQuickBtn">휴일 설정</button>
+      <div class="admin-menu-wrap">
+        <button class="header-settings header-menu-toggle" type="button" id="adminMenuBtn" aria-label="메뉴" aria-expanded="false">
+          <span class="menu-bar" aria-hidden="true"></span>
+          <span class="menu-bar" aria-hidden="true"></span>
+          <span class="menu-bar" aria-hidden="true"></span>
+        </button>
+        <div class="admin-menu" id="adminMenu" aria-hidden="true">
+          <button type="button" id="menuHolidayBtn">휴일 설정</button>
+          <button type="button" id="menuExhibitionBtn">전시회 참석</button>
+        </div>
+      </div>
     </div>
     <div class="mobile-tabs" aria-label="화면 선택">
       <button class="mobile-tab active" type="button" data-view="form">작성하기</button>
@@ -1667,6 +2315,78 @@
       </div>
     </div>
   </div>
+  <div class="exhibition-overlay" id="exhibitionOverlay" aria-hidden="true">
+    <div class="exhibition-box" role="dialog" aria-modal="true" aria-labelledby="exhibitionTitle">
+      <h3 id="exhibitionTitle">전시회 참석</h3>
+      <p>전시회 하나에 여러 날짜를 넣고, 날짜별 참석자를 따로 지정합니다.</p>
+      <div class="exhibition-top-actions">
+        <button class="btn primary" type="button" id="exhibitionFormToggleBtn">행사 입력</button>
+      </div>
+      <div class="exhibition-workspace" id="exhibitionWorkspace">
+        <div class="exhibition-editor" id="exhibitionEditor">
+          <div class="exhibition-form-block">
+            <div class="exhibition-form-block-title">행사 정보</div>
+            <div class="exhibition-grid single">
+              <label>행사명<input id="exhibitionName" type="text" placeholder="예: 가멕스"></label>
+            </div>
+          </div>
+          <div class="exhibition-form-block">
+            <div class="exhibition-form-block-title">날짜 선택</div>
+            <div class="exhibition-range-panel">
+              <input id="exhibitionDate" type="hidden">
+              <input id="exhibitionEndDate" type="hidden">
+              <input id="exhibitionNeededCount" type="hidden" value="2">
+              <button class="btn" type="button" id="exhibitionRangeBtn">날짜 선택</button>
+              <div class="exhibition-range-status" id="exhibitionRangeStatus">전시회 날짜를 선택해주세요.</div>
+            </div>
+          </div>
+          <div class="exhibition-form-block">
+            <div class="exhibition-form-block-title">날짜별 참석자</div>
+            <div class="exhibition-day-list" id="exhibitionAttendees"></div>
+          </div>
+        </div>
+        <div class="exhibition-side">
+          <div class="exhibition-list-wrap">
+            <div class="exhibition-list-title">담당자 참석 현황</div>
+            <div class="exhibition-stats" id="exhibitionOwnerStats"></div>
+          </div>
+          <div class="exhibition-list-wrap">
+            <div class="exhibition-list-title">저장된 전시회</div>
+            <div class="exhibition-list" id="exhibitionList">
+              <div class="exhibition-empty">저장된 전시회가 없습니다.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="exhibition-actions" id="exhibitionActions">
+        <button class="btn primary" type="button" id="exhibitionSaveBtn">저장</button>
+        <button class="btn" type="button" id="exhibitionResetBtn">입력 초기화</button>
+        <button class="btn wide" type="button" id="exhibitionCloseBtn">닫기</button>
+      </div>
+    </div>
+  </div>
+  <div class="exhibition-detail-overlay" id="exhibitionDetailOverlay" aria-hidden="true">
+    <div class="exhibition-detail-box" role="dialog" aria-modal="true" aria-labelledby="exhibitionDetailTitle">
+      <div class="exhibition-detail-head">
+        <div>
+          <h3 id="exhibitionDetailTitle">전시회 상세</h3>
+          <p id="exhibitionDetailMeta">날짜별 참석자를 확인합니다.</p>
+        </div>
+        <button class="btn" type="button" id="exhibitionDetailCloseBtn">닫기</button>
+      </div>
+      <div class="exhibition-detail-layout">
+        <div class="exhibition-detail-section">
+          <h4>날짜별 참석자</h4>
+          <div class="exhibition-detail-days" id="exhibitionDetailDays"></div>
+        </div>
+        <div class="exhibition-detail-section">
+          <h4>담당자별 기록</h4>
+          <div class="exhibition-detail-owner-grid" id="exhibitionDetailOwners"></div>
+          <div class="exhibition-owner-info" id="exhibitionDetailOwnerInfo">이름을 누르면 최근 참석 기록을 볼 수 있습니다.</div>
+        </div>
+      </div>
+    </div>
+  </div>
   <div class="calendar-overlay" id="calendarOverlay" aria-hidden="true">
     <div class="calendar-box" role="dialog" aria-modal="true" aria-labelledby="calendarTitle">
       <div class="calendar-head">
@@ -1674,12 +2394,14 @@
         <strong id="calendarTitle">2026년 7월</strong>
         <button class="btn" type="button" id="calendarNextBtn">다음 달</button>
       </div>
+      <div class="calendar-hint" id="calendarHint"></div>
       <div class="calendar-weekdays">
         <span>일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span>
       </div>
       <div class="calendar-days" id="calendarDays"></div>
-      <div class="calendar-actions">
+      <div class="calendar-actions" id="calendarActions">
         <button class="btn primary" type="button" id="calendarTodayBtn">오늘</button>
+        <button class="btn primary" type="button" id="calendarConfirmBtn">확인</button>
         <button class="btn" type="button" id="calendarCloseBtn">닫기</button>
       </div>
     </div>
@@ -1693,7 +2415,7 @@
       </div>
     </div>
   </div>
-  <script src="app.js?v=20260716-1024"></script>
+  <script src="app.js?v=20260831-0006"></script>
 </body>
 </html>
 
