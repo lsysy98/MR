@@ -473,6 +473,11 @@ function normalizeSearchText(value) {
 function lookupKey(value) {
   return String(value || "").trim().replace(/\s+/g, "").toLowerCase();
 }
+function clientCompareKey(value) {
+  return lookupKey(value)
+    .replace(/[()（）\[\]{}]/g, "")
+    .replace(/치과의원|치과병원|의원|병원/g, "");
+}
 function clientLookupTerm(value) {
   return normalizeClientName(value);
 }
@@ -506,7 +511,6 @@ function renderClientSuggestionMessage(box, message) {
 }
 function clientSuggestionSubtitle(item) {
   var parts = [];
-  if (item.code) parts.push("코드 " + item.code);
   if (item.branch) parts.push(item.branch);
   return parts.join(" · ") || "지점명 없음";
 }
@@ -524,8 +528,8 @@ function setClientMatchStatus(item) {
   }
   var parts = [];
   if (item.existing) parts.push("기존 거래처");
-  else if (item.code) parts.push("거래처 코드 연결");
-  if (item.code) parts.push("코드 " + item.code);
+  else if (item.code) parts.push("거래처 연결");
+  if (item.code) parts.push(item.code);
   if (item.branch) parts.push(item.branch);
   clientMatchStatus.textContent = parts.join(" · ");
   clientMatchStatus.classList.add("active");
@@ -571,7 +575,7 @@ function renderClientSuggestions(box, items, mode) {
   }
   items.forEach(function(item) {
     var button = document.createElement("button");
-    button.className = "client-suggestion";
+    button.className = "client-suggestion" + (item.existing ? " is-existing" : "");
     button.type = "button";
     var title = document.createElement("span");
     title.className = "client-suggestion-title";
@@ -676,8 +680,8 @@ function branchLooksSame(a, b) {
   return Boolean(left && right && left === right);
 }
 function reportClientLooksLikeDirectoryItem(reportClient, directoryItem) {
-  var reportKey = lookupKey(reportClient);
-  var clientKey = lookupKey(directoryItem && directoryItem.client);
+  var reportKey = clientCompareKey(reportClient);
+  var clientKey = clientCompareKey(directoryItem && directoryItem.client);
   var branchKey = normalizeBranchKey(directoryItem && directoryItem.branch);
   var branchTextKey = lookupKey(directoryItem && directoryItem.branch);
   if (!reportKey || !clientKey) return false;
@@ -1358,11 +1362,9 @@ async function loadData() {
   status("보고 데이터를 불러오는 중입니다.", "");
   await loadCalendarDays(true);
   reports = await api("GET");
+  await enrichReportsWithClientDirectory();
   status("", "");
   render();
-  enrichReportsWithClientDirectory().then(function() {
-    render();
-  });
   loadCompletionsForSelectedDate();
 }
 async function addData(item, skipNotice) {
