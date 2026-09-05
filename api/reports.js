@@ -60,8 +60,8 @@ async function supabase(path, options = {}) {
   return data;
 }
 
-function toDb(item) {
-  return {
+function toDb(item, includeClientCode = true) {
+  const row = {
     id: item.id,
     created_at: Number(item.createdAt || Date.now()),
     updated_at: Number(item.updatedAt || Date.now()),
@@ -77,6 +77,8 @@ function toDb(item) {
     prescription_done: Boolean(item.prescriptionDone),
     success_case: item.successCase || ""
   };
+  if (includeClientCode) row.client_code = item.clientCode || "";
+  return row;
 }
 
 function fromDb(row) {
@@ -87,6 +89,7 @@ function fromDb(row) {
     date: row.report_date,
     owner: row.owner,
     client: row.client,
+    clientCode: row.client_code || "",
     branchName: row.branch_name || "",
     type: row.type,
     product: row.product,
@@ -96,6 +99,23 @@ function fromDb(row) {
     prescriptionDone: Boolean(row.prescription_done),
     successCase: row.success_case || ""
   };
+}
+function missingClientCodeColumn(error) {
+  return /client_code|schema cache|column/i.test(error?.message || "");
+}
+async function writeReport(path, method, item) {
+  try {
+    return await supabase(path, {
+      method,
+      body: JSON.stringify(toDb(item, true))
+    });
+  } catch (error) {
+    if (!missingClientCodeColumn(error)) throw error;
+    return await supabase(path, {
+      method,
+      body: JSON.stringify(toDb(item, false))
+    });
+  }
 }
 function logRow(action, actor, beforeRow, afterRow) {
   const beforeData = beforeRow ? fromDb(beforeRow) : null;
@@ -166,11 +186,10 @@ module.exports = async function handler(req, res) {
       item.id = item.id || `${now}-${Math.random().toString(16).slice(2)}`;
       item.createdAt = item.createdAt || now;
       item.updatedAt = now;
-      const rows = await supabase("reports", {
-        method: "POST",
-        body: JSON.stringify(toDb(item))
-      });
-      return json(res, 201, fromDb(rows[0]));
+      const rows = await writeReport("reports", "POST", item);
+      const saved = fromDb(rows[0]);
+      if (!saved.clientCode && item.clientCode) saved.clientCode = item.clientCode;
+      return json(res, 201, saved);
     }
 
     if (req.method === "PUT") {
@@ -178,12 +197,11 @@ module.exports = async function handler(req, res) {
       const actor = item.actor || item.owner || "";
       const oldRows = await supabase(`reports?id=eq.${encodeURIComponent(item.id)}&select=*`);
       item.updatedAt = Date.now();
-      const rows = await supabase(`reports?id=eq.${encodeURIComponent(item.id)}`, {
-        method: "PATCH",
-        body: JSON.stringify(toDb(item))
-      });
+      const rows = await writeReport(`reports?id=eq.${encodeURIComponent(item.id)}`, "PATCH", item);
       await writeLog("update", actor, oldRows[0] || null, rows[0] || null);
-      return json(res, 200, fromDb(rows[0]));
+      const saved = fromDb(rows[0]);
+      if (!saved.clientCode && item.clientCode) saved.clientCode = item.clientCode;
+      return json(res, 200, saved);
     }
 
     if (req.method === "DELETE") {

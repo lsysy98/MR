@@ -147,6 +147,93 @@
     .amount-wrap input { padding-right: 54px; }
     .amount-unit { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 13px; pointer-events: none; }
     .helper { color: var(--muted); font-size: 12px; margin-top: -4px; }
+    .autocomplete-field { position: relative; }
+    .client-suggestions {
+      display: none;
+      gap: 6px;
+      margin-top: -2px;
+      padding: 6px;
+      border: 1px solid #efc7ad;
+      border-radius: 8px;
+      background: #fffaf6;
+      box-shadow: 0 12px 26px rgba(95, 58, 27, .12);
+    }
+    .client-suggestions.active { display: grid; }
+    .client-suggestion {
+      width: 100%;
+      min-height: 44px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 4px 10px;
+      align-items: center;
+      border: 1px solid transparent;
+      border-radius: 7px;
+      background: #fff;
+      color: var(--text);
+      padding: 8px 10px;
+      text-align: left;
+      cursor: pointer;
+    }
+    .client-suggestion:hover,
+    .client-suggestion:focus-visible {
+      border-color: #f6b68a;
+      background: #fff3eb;
+      outline: none;
+    }
+    .client-suggestion strong {
+      min-width: 0;
+      font-size: 14px;
+      font-weight: 900;
+      overflow-wrap: anywhere;
+    }
+    .client-suggestion-title {
+      min-width: 0;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      flex-wrap: wrap;
+    }
+    .client-existing-badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 20px;
+      padding: 0 7px;
+      border-radius: 999px;
+      background: #fff0e6;
+      color: #c64e13;
+      font-size: 11px;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+    .client-suggestion code {
+      color: #c64e13;
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+    .client-suggestion small {
+      grid-column: 1 / -1;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .client-suggestion.empty {
+      min-height: 36px;
+      grid-template-columns: 1fr;
+      color: var(--muted);
+      cursor: default;
+    }
+    .client-match-status {
+      display: none;
+      margin-top: -2px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+      line-height: 1.35;
+    }
+    .client-match-status.active { display: block; }
+    .client-match-status.existing { color: #c64e13; }
     .product-select-btn {
       width: 100%;
       min-height: 44px;
@@ -1221,6 +1308,7 @@
     .report-top { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px; align-items: start; }
     .client-wrap { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; min-width: 0; }
     .client { font-weight: 900; font-size: 15px; line-height: 1.25; overflow-wrap: anywhere; }
+    .client-code { color: #9a8778; font-size: 10px; font-weight: 900; letter-spacing: 0; white-space: nowrap; }
     .success-case-mark {
       display: inline-flex;
       align-items: center;
@@ -2066,9 +2154,12 @@
           </select>
         </label>
         <label>날짜 <span class="date-input-wrap"><input id="date" type="text" readonly required></span></label>
-        <label>거래처명 <input id="client" type="text" required autocomplete="off"></label>
-        <label><span>지점명 <span class="label-muted">(선택)</span></span>
-          <input id="branchName" type="text" placeholder="선택 입력" autocomplete="off">
+        <label class="autocomplete-field">거래처 입력
+          <input id="client" type="text" required autocomplete="off" placeholder="치과명 또는 거래처코드">
+          <input id="clientCode" type="hidden">
+          <input id="branchName" type="hidden">
+          <div class="client-suggestions" id="clientSuggestions" aria-live="polite"></div>
+          <div class="client-match-status" id="clientMatchStatus" aria-live="polite"></div>
         </label>
         <label>구분
           <div class="seg">
@@ -2117,7 +2208,7 @@
         <div class="head with-search">
           <h2>담당자별 현황</h2>
           <div class="owner-search-control">
-            <input class="owner-search" id="ownerSearchInput" type="search" placeholder="치과명/지점명 검색" autocomplete="off" aria-label="담당자별 치과명 또는 지점명 검색">
+            <input class="owner-search" id="ownerSearchInput" type="search" placeholder="치과명/코드/지점명 검색" autocomplete="off" aria-label="담당자별 치과명, 거래처코드 또는 지점명 검색">
             <button class="btn owner-search-btn" id="ownerSearchBtn" type="button">검색</button>
           </div>
         </div>
@@ -2415,7 +2506,7 @@
       </div>
     </div>
   </div>
-  <script src="app.js?v=20260831-0006"></script>
+  <script src="app.js?v=20260906-0002"></script>
 </body>
 </html>
 
