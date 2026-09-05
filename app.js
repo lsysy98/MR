@@ -59,6 +59,12 @@ var clientSuggestions = document.getElementById("clientSuggestions");
 var clientCodeSuggestions = document.getElementById("clientCodeSuggestions");
 var clientMatchStatus = document.getElementById("clientMatchStatus");
 var branchInput = document.getElementById("branchName");
+var manualClientOverlay = document.getElementById("manualClientOverlay");
+var manualClientName = document.getElementById("manualClientName");
+var manualClientBranch = document.getElementById("manualClientBranch");
+var manualClientCode = document.getElementById("manualClientCode");
+var manualClientSaveBtn = document.getElementById("manualClientSaveBtn");
+var manualClientCloseBtn = document.getElementById("manualClientCloseBtn");
 var productInput = document.getElementById("product");
 var productChooseBtn = document.getElementById("productChooseBtn");
 var productChooseText = document.getElementById("productChooseText");
@@ -476,7 +482,9 @@ function lookupKey(value) {
 function clientCompareKey(value) {
   return lookupKey(value)
     .replace(/[()（）\[\]{}]/g, "")
-    .replace(/치과의원|치과병원|의원|병원/g, "");
+    .replace(/치과의원/g, "치과")
+    .replace(/치과병원/g, "치과")
+    .replace(/의원|병원/g, "");
 }
 function clientLookupTerm(value) {
   return normalizeClientName(value);
@@ -488,8 +496,7 @@ function currentOwnerBranchScope() {
 function applyClientLookupParams(params) {
   var owner = ownerInput ? ownerInput.value.trim() : "";
   if (owner) params.set("owner", owner);
-  var branches = currentOwnerBranchScope();
-  if (branches.length) params.set("branches", branches.join(","));
+  return params;
 }
 function hideClientSuggestions(box) {
   if (!box) return;
@@ -506,6 +513,27 @@ function renderClientSuggestionMessage(box, message) {
   var row = document.createElement("div");
   row.className = "client-suggestion empty";
   row.textContent = message;
+  box.appendChild(row);
+  box.classList.add("active");
+}
+function renderClientNoResultMessage(box, term) {
+  if (!box) return;
+  box.textContent = "";
+  var row = document.createElement("div");
+  row.className = "client-suggestion empty no-result";
+  var text = document.createElement("span");
+  text.textContent = "검색 결과가 없습니다.";
+  var button = document.createElement("button");
+  button.className = "btn client-register-btn";
+  button.type = "button";
+  button.textContent = "새 거래처 등록";
+  button.addEventListener("click", function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    openManualClientModal(term);
+  });
+  row.appendChild(text);
+  row.appendChild(button);
   box.appendChild(row);
   box.classList.add("active");
 }
@@ -615,11 +643,13 @@ async function loadClientSuggestions(mode) {
   try {
     var params = new URLSearchParams();
     params.set("q", term);
-    params.set("limit", "12");
+    params.set("limit", "20");
     applyClientLookupParams(params);
     var result = await requestJson("/api/clients?" + params.toString(), { method: "GET" }, 10000);
     if (seq !== clientLookupSeq) return;
-    renderClientSuggestions(box, result.items || [], mode);
+    var items = result.items || [];
+    if (!items.length) renderClientNoResultMessage(box, term);
+    else renderClientSuggestions(box, items, mode);
   } catch (error) {
     if (seq !== clientLookupSeq) return;
     renderClientSuggestionMessage(box, "거래처 목록을 불러오지 못했습니다.");
@@ -686,6 +716,8 @@ function reportClientLooksLikeDirectoryItem(reportClient, directoryItem) {
   var branchTextKey = lookupKey(directoryItem && directoryItem.branch);
   if (!reportKey || !clientKey) return false;
   if (reportKey === clientKey) return true;
+  if (reportKey.length >= 5 && clientKey.indexOf(reportKey) >= 0) return true;
+  if (clientKey.length >= 5 && reportKey.indexOf(clientKey) >= 0) return true;
   if (!branchKey) return false;
   return reportKey === branchTextKey + clientKey ||
     reportKey === clientKey + branchTextKey ||
@@ -720,6 +752,51 @@ function uniqueClientDirectoryMatch(report) {
     return branchMatches.length === 1 ? branchMatches[0] : null;
   }
   return clientMatches.length === 1 ? clientMatches[0] : null;
+}
+function openManualClientModal(term) {
+  if (!manualClientOverlay) return;
+  var value = normalizeClientName(term || (clientInput ? clientInput.value : ""));
+  var isCode = /^\d{2,}$/.test(value.replace(/\s+/g, ""));
+  if (manualClientName) manualClientName.value = isCode ? "" : value;
+  if (manualClientCode) manualClientCode.value = isCode ? value : "";
+  if (manualClientBranch) manualClientBranch.value = branchInput && branchInput.value ? branchInput.value : "";
+  manualClientOverlay.classList.add("active");
+  manualClientOverlay.setAttribute("aria-hidden", "false");
+  setTimeout(function() {
+    if (manualClientName && !manualClientName.value) manualClientName.focus();
+    else if (manualClientBranch && !manualClientBranch.value) manualClientBranch.focus();
+    else if (manualClientCode) manualClientCode.focus();
+  }, 0);
+}
+function closeManualClientModal() {
+  if (!manualClientOverlay) return;
+  manualClientOverlay.classList.remove("active");
+  manualClientOverlay.setAttribute("aria-hidden", "true");
+}
+async function saveManualClient() {
+  var client = manualClientName ? manualClientName.value.trim() : "";
+  var branch = manualClientBranch ? manualClientBranch.value.trim() : "";
+  var code = manualClientCode ? manualClientCode.value.trim() : "";
+  if (!client) {
+    showNotice("치과명을 입력해주세요.", "danger");
+    if (manualClientName) manualClientName.focus();
+    return;
+  }
+  if (!branch) {
+    showNotice("지점을 입력해주세요.", "danger");
+    if (manualClientBranch) manualClientBranch.focus();
+    return;
+  }
+  var result = await requestJson("/api/clients", {
+    method: "POST",
+    body: JSON.stringify({ client: client, branch: branch, code: code })
+  }, 10000);
+  var item = result.item || { client: client, branch: branch, code: code, existing: false };
+  clientDirectory = [];
+  clientDirectoryPromise = null;
+  applyClientMatch(item);
+  closeManualClientModal();
+  showNotice("새 거래처를 등록했습니다.");
 }
 async function enrichReportsWithClientDirectory() {
   await loadClientDirectory();
@@ -1323,7 +1400,7 @@ async function exhibitionApi(method, body, query) {
 function exhibitionErrorMessage(error) {
   var message = error && error.message ? error.message : String(error || "");
   if (/exhibition_event_days|event_day_id|schema cache|relation/i.test(message)) {
-    return "전시회 날짜별 저장용 SQL이 아직 적용되지 않았습니다. 테스트 Supabase SQL을 한 번 실행해주세요.";
+    return "전시회 날짜별 저장용 SQL이 아직 적용되지 않았습니다. Supabase SQL을 한 번 실행해주세요.";
   }
   return message;
 }
@@ -4316,6 +4393,16 @@ if (successCaseOverlay) {
   successCaseOverlay.addEventListener("click", function(e) {
     if (e.target === successCaseOverlay) closeSuccessCaseModal();
   });
+}
+if (manualClientSaveBtn) {
+  manualClientSaveBtn.addEventListener("click", function() {
+    saveManualClient().catch(function(error) {
+      showNotice("새 거래처 등록 실패: " + error.message, "danger");
+    });
+  });
+}
+if (manualClientCloseBtn) {
+  manualClientCloseBtn.addEventListener("click", closeManualClientModal);
 }
 if (clientInput) {
   clientInput.addEventListener("input", function() {

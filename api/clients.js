@@ -1,3 +1,5 @@
+const crypto = require("crypto");
+
 const DEFAULT_CIMS_SHEET_ID = "1ciVrJFqZyrXQvgBxZtSLwn9MxvOculLugDERIpHeEkY";
 const DEFAULT_CIMS_SHEET_GID = "0";
 const DEFAULT_STATS_SHEET_ID = "18g8f_EtcBQ7bMTg8rwnkHUsMxmHFAxoAz7hcF9weFm8";
@@ -62,11 +64,21 @@ function normalizeBranch(value) {
 function normalizeClinicName(value) {
   return normalize(value)
     .replace(/[()（）\[\]{}]/g, "")
-    .replace(/치과의원|치과병원|의원|병원/g, "");
+    .replace(/치과의원/g, "치과")
+    .replace(/치과병원/g, "치과")
+    .replace(/의원|병원/g, "");
 }
 
 function isCimsBranchAllowed(branch) {
   return /지점$/.test(cleanCell(branch));
+}
+
+function isClientAllowed(client) {
+  return !normalize(client).includes("기공소");
+}
+
+function sha(value) {
+  return crypto.createHash("sha1").update(value).digest("hex").slice(0, 24);
 }
 
 function uniqueValues(values) {
@@ -123,6 +135,24 @@ function parseCsv(text) {
   row.push(cell);
   rows.push(row);
   return rows;
+}
+
+async function readBody(req) {
+  if (req.body && typeof req.body === "object") return req.body;
+  if (typeof req.body === "string") return JSON.parse(req.body || "{}");
+
+  return await new Promise((resolve, reject) => {
+    let raw = "";
+    req.on("data", chunk => { raw += chunk; });
+    req.on("end", () => {
+      try {
+        resolve(raw ? JSON.parse(raw) : {});
+      } catch (error) {
+        reject(error);
+      }
+    });
+    req.on("error", reject);
+  });
 }
 
 async function supabase(path, options = {}) {
@@ -197,6 +227,7 @@ function rowsFromCimsCsv(text) {
     .filter((item) => {
       if (item.index === headerIndex) return false;
       if (!item.client) return false;
+      if (!isClientAllowed(item.client)) return false;
       if (!isCimsBranchAllowed(item.branch)) return false;
       const key = item.code ? `code:${normalize(item.code)}` : `client:${normalize(item.client)}:${normalize(item.branch)}`;
       if (seen.has(key)) return false;
@@ -358,6 +389,43 @@ function supabaseItemFromRow(row, existingKeys) {
   };
 }
 
+function clientDirectoryRowFromInput(input) {
+  const client = cleanCell(input.client || input.clientName);
+  const branch = cleanCell(input.branch || input.branchName);
+  const code = cleanCell(input.code || input.clientCode);
+  const branchKey = normalizeBranch(branch);
+  const codeKey = normalize(code);
+  if (!client) throw new Error("치과명을 입력해주세요.");
+  if (!branch) throw new Error("지점을 입력해주세요.");
+
+  return {
+    id: codeKey ? `manual-code-${codeKey}` : `manual-${sha(`${client}|${branch}`)}`,
+    client_code: code,
+    client_name: client,
+    branch_name: branch,
+    branch_key: branchKey,
+    search_text: normalize(`${code} ${client} ${branch}`),
+    sort_order: 900000,
+    updated_at: Date.now()
+  };
+}
+
+async function saveManualClient(input) {
+  const row = clientDirectoryRowFromInput(input);
+  const rows = await supabase("client_directory?on_conflict=id", {
+    method: "POST",
+    headers: { Prefer: "resolution=merge-duplicates,return=representation" },
+    body: JSON.stringify(row)
+  });
+  const saved = Array.isArray(rows) && rows[0] ? rows[0] : row;
+  return {
+    code: saved.client_code || "",
+    client: saved.client_name || row.client_name,
+    branch: saved.branch_name || row.branch_name,
+    existing: false
+  };
+}
+
 async function supabasePaged(pathBase, pageSize = 1000, maxPages = 30) {
   const rows = [];
   for (let page = 0; page < maxPages; page += 1) {
@@ -403,7 +471,7 @@ async function readSupabaseLookup(owner, query, includeAll, limit) {
   const existingRows = await supabasePaged("existing_clients?select=client_code,client_name");
   const existingKeys = existingKeySet(existingRows);
   let rows = directoryRows
-    .filter((row) => isCimsBranchAllowed(row.branch_name))
+    .filter((row) => isClientAllowed(row.client_name))
     .map((row) => supabaseItemFromRow(row, existingKeys));
 
   if (query) {
@@ -436,6 +504,11 @@ module.exports = async function handler(req, res) {
     const includeAll = requestUrl.searchParams.get("all") === "1";
     const owner = cleanCell(requestUrl.searchParams.get("owner"));
     const limit = Math.max(1, Math.min(50, Number(requestUrl.searchParams.get("limit") || 20)));
+
+    if (req.method === "POST") {
+      const item = await saveManualClient(await readBody(req));
+      return json(res, 201, { ok: true, item });
+    }
 
     if (req.method !== "GET") {
       return json(res, 405, { error: "Method not allowed" });

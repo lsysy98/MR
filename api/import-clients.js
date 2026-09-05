@@ -60,11 +60,17 @@ function normalizeBranch(value) {
 function normalizeClinicName(value) {
   return normalize(value)
     .replace(/[()（）\[\]{}]/g, "")
-    .replace(/치과의원|치과병원|의원|병원/g, "");
+    .replace(/치과의원/g, "치과")
+    .replace(/치과병원/g, "치과")
+    .replace(/의원|병원/g, "");
 }
 
 function isCimsBranchAllowed(branch) {
   return /지점$/.test(cleanCell(branch));
+}
+
+function isClientAllowed(client) {
+  return !normalize(client).includes("기공소");
 }
 
 function sha(value) {
@@ -137,6 +143,7 @@ function rowsFromCimsCsv(text) {
     .filter((item) => {
       if (item.index === headerIndex) return false;
       if (!item.client) return false;
+      if (!isClientAllowed(item.client)) return false;
       if (!isCimsBranchAllowed(item.branch)) return false;
       const key = item.code ? `code:${normalize(item.code)}` : `client:${normalize(item.client)}:${normalize(item.branch)}`;
       if (seen.has(key)) return false;
@@ -303,6 +310,8 @@ function reportClientLooksLikeDirectoryItem(reportClient, directoryItem) {
   const branchTextKey = normalize(directoryItem && directoryItem.branch_name);
   if (!reportKey || !clientKey) return false;
   if (reportKey === clientKey) return true;
+  if (reportKey.length >= 5 && clientKey.includes(reportKey)) return true;
+  if (clientKey.length >= 5 && reportKey.includes(clientKey)) return true;
   if (!branchKey) return false;
   return reportKey === branchTextKey + clientKey ||
     reportKey === clientKey + branchTextKey ||
@@ -373,35 +382,34 @@ function rowsForReportOwner(report, rows, ownerBranchMap) {
     : rows;
 }
 
-function uniqueExistingReportMatch(report, existingRows, ownerBranchMap) {
-  if (!report || cleanCell(report.client_code)) return null;
-  let matches = rowsForReportOwner(report, existingRows, ownerBranchMap)
-    .filter((item) => reportClientLooksLikeDirectoryItem(report.client, item));
-  if (!matches.length) return null;
+function reportMatchesFromRows(report, rows) {
+  let matches = rows.filter((item) => reportClientLooksLikeDirectoryItem(report.client, item));
+  if (!matches.length) return [];
 
   if (report.branch_name) {
     const branchMatches = matches.filter((item) => branchLooksSame(item.branch_name, report.branch_name));
     if (branchMatches.length) matches = branchMatches;
   }
 
-  return bestUniqueMatch(report, matches);
+  return matches;
+}
+
+function uniqueExistingReportMatch(report, existingRows, ownerBranchMap) {
+  if (!report || cleanCell(report.client_code)) return null;
+  const scopedRows = rowsForReportOwner(report, existingRows, ownerBranchMap);
+  const scopedMatch = bestUniqueMatch(report, reportMatchesFromRows(report, scopedRows));
+  if (scopedMatch) return scopedMatch;
+  if (scopedRows.length === existingRows.length) return null;
+  return bestUniqueMatch(report, reportMatchesFromRows(report, existingRows));
 }
 
 function uniqueReportMatch(report, directoryRows, ownerBranchMap) {
   if (!report || cleanCell(report.client_code)) return null;
-  const ownerBranches = ownerBranchMap.get(normalize(report.owner)) || new Set();
-  const ownerScoped = ownerBranches.size
-    ? directoryRows.filter((item) => ownerBranches.has(item.branch_key))
-    : directoryRows;
-  let matches = ownerScoped.filter((item) => reportClientLooksLikeDirectoryItem(report.client, item));
-  if (!matches.length) return null;
-
-  if (report.branch_name) {
-    const branchMatches = matches.filter((item) => branchLooksSame(item.branch_name, report.branch_name));
-    if (branchMatches.length) matches = branchMatches;
-  }
-
-  return bestUniqueMatch(report, matches);
+  const scopedRows = rowsForReportOwner(report, directoryRows, ownerBranchMap);
+  const scopedMatch = bestUniqueMatch(report, reportMatchesFromRows(report, scopedRows));
+  if (scopedMatch) return scopedMatch;
+  if (scopedRows.length === directoryRows.length) return null;
+  return bestUniqueMatch(report, reportMatchesFromRows(report, directoryRows));
 }
 
 async function supabasePaged(pathBase, pageSize = 1000, maxPages = 30) {
@@ -512,14 +520,18 @@ module.exports = async function handler(req, res) {
     const branchRows = ownerBranchRows(statsRows, now);
     const existingRows = existingClientRows(statsRows, now);
 
-    await clearTable("client_directory");
+    await supabase("client_directory?id=not.like.manual-%", {
+      method: "DELETE",
+      headers: { Prefer: "return=minimal" }
+    });
     await clearTable("owner_branch_map");
     await clearTable("existing_clients");
 
     await upsertRows("client_directory", directoryRows);
     await upsertRows("owner_branch_map", branchRows);
     await upsertRows("existing_clients", existingRows);
-    const backfill = await backfillReportClientCodes(directoryRows, branchRows, existingRows);
+    const currentDirectoryRows = await supabasePaged("client_directory?select=client_code,client_name,branch_name,branch_key,sort_order");
+    const backfill = await backfillReportClientCodes(currentDirectoryRows, branchRows, existingRows);
 
     return json(res, 200, {
       ok: true,
@@ -528,7 +540,7 @@ module.exports = async function handler(req, res) {
       ownerBranchCount: branchRows.length,
       existingClientCount: existingRows.length,
       reportClientCodeBackfill: backfill,
-      cimsRule: "CIMS K열이 지점으로 끝나는 거래처만 저장했습니다."
+      cimsRule: "CIMS K열이 지점으로 끝나고, 거래처명에 기공소가 없는 거래처만 저장했습니다."
     });
   } catch (error) {
     return json(res, 500, { error: error.message });

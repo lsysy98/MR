@@ -237,6 +237,18 @@
       color: var(--muted);
       cursor: default;
     }
+    .client-suggestion.no-result {
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 8px;
+    }
+    .client-register-btn {
+      min-height: 32px;
+      padding: 0 10px;
+      font-size: 12px;
+      font-weight: 900;
+      white-space: nowrap;
+    }
     .client-match-status {
       display: none;
       margin-top: -2px;
@@ -256,6 +268,45 @@
       color: #9f3909;
       padding: 5px 8px;
       font-weight: 900;
+    }
+    .manual-client-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 126;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 18px;
+      background: rgba(32, 26, 22, .42);
+    }
+    .manual-client-overlay.active { display: flex; }
+    .manual-client-box {
+      width: min(560px, 100%);
+      display: grid;
+      gap: 14px;
+      padding: 18px;
+      border: 1px solid #efc7ad;
+      border-radius: 8px;
+      background: #fff;
+      box-shadow: 0 22px 56px rgba(54, 34, 19, .26);
+    }
+    .manual-client-head {
+      display: flex;
+      align-items: start;
+      justify-content: space-between;
+      gap: 12px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--line);
+    }
+    .manual-client-head h3 { margin: 0; font-size: 18px; }
+    .manual-client-head p { margin: 5px 0 0; color: var(--muted); font-size: 13px; line-height: 1.45; }
+    .manual-client-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .manual-client-grid label:first-child { grid-column: 1 / -1; }
+    .manual-client-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      padding-top: 2px;
     }
     .product-select-btn {
       width: 100%;
@@ -2088,6 +2139,8 @@
       body.view-today .input-panel, body.view-today .dashboard, body.view-today .meeting-panel { display: none; }
       body.view-meeting .input-panel, body.view-meeting .dashboard, body.view-meeting .today-panel { display: none; }
       .input-panel, .dashboard, .today-panel, .meeting-panel { scroll-margin-top: 108px; }
+      .manual-client-grid { grid-template-columns: 1fr; }
+      .manual-client-actions { display: grid; grid-template-columns: 1fr; }
       .meeting-grid { grid-template-columns: 1fr; }
       .meeting-total { font-size: 20px; }
       .meeting-slide { padding: 12px; }
@@ -2377,6 +2430,25 @@
       </div>
     </div>
   </div>
+  <div class="manual-client-overlay" id="manualClientOverlay" aria-hidden="true">
+    <div class="manual-client-box" role="dialog" aria-modal="true" aria-labelledby="manualClientTitle">
+      <div class="manual-client-head">
+        <div>
+          <h3 id="manualClientTitle">새 거래처 등록</h3>
+          <p>CIMS에 아직 없는 거래처를 검색용 DB에 등록합니다.</p>
+        </div>
+        <button class="btn" type="button" id="manualClientCloseBtn">닫기</button>
+      </div>
+      <div class="manual-client-grid">
+        <label>치과명<input id="manualClientName" type="text" autocomplete="off"></label>
+        <label>지점<input id="manualClientBranch" type="text" autocomplete="off" placeholder="예: 서초지점"></label>
+        <label>거래처코드<input id="manualClientCode" type="text" inputmode="numeric" autocomplete="off" placeholder="알면 입력"></label>
+      </div>
+      <div class="manual-client-actions">
+        <button class="btn primary" type="button" id="manualClientSaveBtn">등록</button>
+      </div>
+    </div>
+  </div>
   <div class="weekly-report-overlay" id="weeklyReportPanel" aria-hidden="true">
     <div class="weekly-report-box" role="dialog" aria-modal="true" aria-labelledby="weeklyReportTitle">
       <h3 id="weeklyReportTitle">카톡 보고 문구</h3>
@@ -2541,7 +2613,7 @@
       </div>
     </div>
   </div>
-  <script src="app.js?v=20260906-0009"></script>
+  <script src="app.js?v=20260906-0010"></script>
 </body>
 </html>
 
