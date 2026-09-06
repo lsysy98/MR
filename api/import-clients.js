@@ -321,7 +321,7 @@ function reportClientLooksLikeDirectoryItem(reportClient, directoryItem) {
 function branchLooksSame(a, b) {
   const left = normalizeBranch(a);
   const right = normalizeBranch(b);
-  return Boolean(left && right && (left === right || left.includes(right) || right.includes(left)));
+  return Boolean(left && right && left === right);
 }
 
 function buildOwnerBranchMap(branchRows) {
@@ -351,6 +351,7 @@ function scoreReportMatch(report, item) {
   const reportBranch = normalizeBranch(report.branch_name);
   const itemBranch = normalizeBranch(item && item.branch_name);
   if (!reportKey || !clientKey) return 99;
+  if (reportBranch && itemBranch && !branchLooksSame(itemBranch, reportBranch)) return 99;
   if (reportKey === clientKey && reportBranch && itemBranch && branchLooksSame(itemBranch, reportBranch)) return 0;
   if (reportKey === clientKey) return 1;
   if (reportClientLooksLikeDirectoryItem(report.client, item) && reportBranch && itemBranch && branchLooksSame(itemBranch, reportBranch)) return 2;
@@ -382,34 +383,55 @@ function rowsForReportOwner(report, rows, ownerBranchMap) {
     : rows;
 }
 
-function reportMatchesFromRows(report, rows) {
+function reportMatchesFromRows(report, rows, options = {}) {
   let matches = rows.filter((item) => reportClientLooksLikeDirectoryItem(report.client, item));
   if (!matches.length) return [];
 
-  if (report.branch_name) {
+  if (report.branch_name && !options.ignoreBranch) {
     const branchMatches = matches.filter((item) => branchLooksSame(item.branch_name, report.branch_name));
-    if (branchMatches.length) matches = branchMatches;
+    return branchMatches;
   }
 
   return matches;
 }
 
-function uniqueExistingReportMatch(report, existingRows, ownerBranchMap) {
-  if (!report || cleanCell(report.client_code)) return null;
-  const scopedRows = rowsForReportOwner(report, existingRows, ownerBranchMap);
-  const scopedMatch = bestUniqueMatch(report, reportMatchesFromRows(report, scopedRows));
-  if (scopedMatch) return scopedMatch;
-  if (scopedRows.length === existingRows.length) return null;
-  return bestUniqueMatch(report, reportMatchesFromRows(report, existingRows));
+function bestReportMatch(report, rows, ignoreBranch) {
+  const probe = ignoreBranch ? { ...report, branch_name: "" } : report;
+  return bestUniqueMatch(probe, reportMatchesFromRows(report, rows, { ignoreBranch }));
 }
 
-function uniqueReportMatch(report, directoryRows, ownerBranchMap) {
-  if (!report || cleanCell(report.client_code)) return null;
-  const scopedRows = rowsForReportOwner(report, directoryRows, ownerBranchMap);
-  const scopedMatch = bestUniqueMatch(report, reportMatchesFromRows(report, scopedRows));
-  if (scopedMatch) return scopedMatch;
-  if (scopedRows.length === directoryRows.length) return null;
-  return bestUniqueMatch(report, reportMatchesFromRows(report, directoryRows));
+function rowsForReportBranch(report, rows) {
+  const reportBranch = cleanCell(report && report.branch_name);
+  if (!reportBranch) return [];
+  return rows.filter((item) => branchLooksSame(item.branch_name, reportBranch));
+}
+
+function uniqueExistingReportMatch(report, existingRows) {
+  if (!report) return null;
+  const branchRows = rowsForReportBranch(report, existingRows);
+  if (branchRows.length || cleanCell(report.branch_name)) {
+    return bestReportMatch(report, branchRows, false);
+  }
+
+  return bestReportMatch(report, existingRows, false);
+}
+
+function uniqueReportMatch(report, directoryRows) {
+  if (!report) return null;
+  const branchRows = rowsForReportBranch(report, directoryRows);
+  if (branchRows.length || cleanCell(report.branch_name)) {
+    return bestReportMatch(report, branchRows, false);
+  }
+
+  return bestReportMatch(report, directoryRows, false);
+}
+
+function currentCodeRow(report, directoryRows, existingRows) {
+  const currentCode = normalize(report && report.client_code);
+  if (!currentCode) return null;
+  return directoryRows.find((item) => normalize(item.client_code) === currentCode) ||
+    existingRows.find((item) => normalize(item.client_code) === currentCode) ||
+    null;
 }
 
 async function supabasePaged(pathBase, pageSize = 1000, maxPages = 30) {
@@ -426,50 +448,77 @@ async function supabasePaged(pathBase, pageSize = 1000, maxPages = 30) {
 
 async function backfillReportClientCodes(directoryRows, branchRows, existingRows) {
   const reportRows = await supabasePaged("reports?select=id,owner,client,branch_name,client_code&order=created_at.asc");
-  const ownerBranchMap = buildOwnerBranchMap(branchRows);
   let updated = 0;
   let ambiguous = 0;
   let skipped = 0;
   let existingMatched = 0;
   let directoryMatched = 0;
+  let corrected = 0;
+  let clearedWrongBranch = 0;
   const unresolvedSamples = [];
 
   for (const report of reportRows) {
-    if (cleanCell(report.client_code)) {
-      skipped += 1;
-      continue;
-    }
     let source = "existing";
-    let match = uniqueExistingReportMatch(report, existingRows, ownerBranchMap);
+    let match = uniqueExistingReportMatch(report, existingRows);
     if (!match) {
       source = "directory";
-      match = uniqueReportMatch(report, directoryRows, ownerBranchMap);
+      match = uniqueReportMatch(report, directoryRows);
     }
+    const currentCode = cleanCell(report.client_code);
     if (!match) {
-      ambiguous += 1;
-      if (unresolvedSamples.length < 20) {
-        unresolvedSamples.push({
-          owner: report.owner || "",
-          client: report.client || "",
-          branchName: report.branch_name || ""
+      const existingCodeRow = currentCodeRow(report, directoryRows, existingRows);
+      if (currentCode && report.branch_name && existingCodeRow && existingCodeRow.branch_name &&
+          !branchLooksSame(existingCodeRow.branch_name, report.branch_name)) {
+        await supabase(`reports?id=eq.${encodeURIComponent(report.id)}`, {
+          method: "PATCH",
+          headers: { Prefer: "return=minimal" },
+          body: JSON.stringify({
+            client_code: "",
+            branch_name: report.branch_name || ""
+          })
         });
+        updated += 1;
+        corrected += 1;
+        clearedWrongBranch += 1;
+        continue;
       }
+      if (currentCode) {
+        skipped += 1;
+      } else {
+        ambiguous += 1;
+        if (unresolvedSamples.length < 20) {
+          unresolvedSamples.push({
+            owner: report.owner || "",
+            client: report.client || "",
+            branchName: report.branch_name || ""
+          });
+        }
+      }
+      continue;
+    }
+    const nextCode = cleanCell(match.client_code);
+    const nextBranch = cleanCell(match.branch_name || report.branch_name);
+    const currentBranch = cleanCell(report.branch_name);
+    if (currentCode && (!nextCode || normalize(currentCode) === normalize(nextCode)) &&
+        (!nextBranch || branchLooksSame(currentBranch, nextBranch) || currentBranch === nextBranch)) {
+      skipped += 1;
       continue;
     }
     await supabase(`reports?id=eq.${encodeURIComponent(report.id)}`, {
       method: "PATCH",
       headers: { Prefer: "return=minimal" },
       body: JSON.stringify({
-        client_code: match.client_code || "",
-        branch_name: report.branch_name || match.branch_name || ""
+        client_code: nextCode || currentCode,
+        branch_name: nextBranch || currentBranch || ""
       })
     });
     updated += 1;
+    if (currentCode && nextCode && normalize(currentCode) !== normalize(nextCode)) corrected += 1;
     if (source === "existing") existingMatched += 1;
     else directoryMatched += 1;
   }
 
-  return { total: reportRows.length, updated, existingMatched, directoryMatched, ambiguous, skipped, unresolvedSamples };
+  return { total: reportRows.length, updated, corrected, clearedWrongBranch, existingMatched, directoryMatched, ambiguous, skipped, unresolvedSamples };
 }
 
 async function clearTable(table) {

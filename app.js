@@ -60,6 +60,12 @@ var clientCodeSuggestions = document.getElementById("clientCodeSuggestions");
 var clientMatchStatus = document.getElementById("clientMatchStatus");
 var branchInput = document.getElementById("branchName");
 var manualClientOverlay = document.getElementById("manualClientOverlay");
+var manualClientTitle = document.getElementById("manualClientTitle");
+var manualClientHelp = document.getElementById("manualClientHelp");
+var manualClientSearch = document.getElementById("manualClientSearch");
+var manualClientResults = document.getElementById("manualClientResults");
+var manualClientAddPanel = document.getElementById("manualClientAddPanel");
+var manualClientAddToggleBtn = document.getElementById("manualClientAddToggleBtn");
 var manualClientName = document.getElementById("manualClientName");
 var manualClientBranch = document.getElementById("manualClientBranch");
 var manualClientCode = document.getElementById("manualClientCode");
@@ -181,9 +187,14 @@ var noticeActionRequired = false;
 var ownerLeaveRows = [];
 var clientLookupTimer = null;
 var clientLookupSeq = 0;
+var manualClientLookupTimer = null;
+var manualClientLookupSeq = 0;
 var lastSelectedClientMatch = null;
 var clientDirectory = [];
 var clientDirectoryPromise = null;
+var manualBranchOptions = [];
+var manualBranchOptionsPromise = null;
+var resumeSubmitAfterClientSelection = false;
 var editingLeaveRangeDates = [];
 var exhibitionEditingId = "";
 var openedExhibitionId = "";
@@ -526,11 +537,11 @@ function renderClientNoResultMessage(box, term) {
   var button = document.createElement("button");
   button.className = "btn client-register-btn";
   button.type = "button";
-  button.textContent = "새 거래처 등록";
+  button.textContent = "거래처 추가";
   button.addEventListener("click", function(e) {
     e.preventDefault();
     e.stopPropagation();
-    openManualClientModal(term);
+    openManualClientModal(term, false, true);
   });
   row.appendChild(text);
   row.appendChild(button);
@@ -753,17 +764,174 @@ function uniqueClientDirectoryMatch(report) {
   }
   return clientMatches.length === 1 ? clientMatches[0] : null;
 }
-function openManualClientModal(term) {
+function hasClientSelectionForCurrentInput() {
+  var client = clientInput ? clientInput.value.trim() : "";
+  var code = clientCodeInput ? clientCodeInput.value.trim() : "";
+  var branch = branchInput ? branchInput.value.trim() : "";
+  if (!client) return false;
+  if (lastSelectedClientMatch) {
+    var selectedClient = normalizeClientName(lastSelectedClientMatch.client || "");
+    var selectedBranch = normalizeBranchKey(lastSelectedClientMatch.branch || "");
+    var selectedCode = lookupKey(lastSelectedClientMatch.code || "");
+    var sameClient = selectedClient && selectedClient === normalizeClientName(client);
+    var sameBranch = !selectedBranch || selectedBranch === normalizeBranchKey(branch);
+    var sameCode = !selectedCode || selectedCode === lookupKey(code);
+    if (sameClient && sameBranch && sameCode) return true;
+  }
+  return false;
+}
+function renderManualClientResultMessage(message) {
+  if (!manualClientResults) return;
+  manualClientResults.textContent = "";
+  var row = document.createElement("div");
+  row.className = "client-suggestion empty";
+  row.textContent = message;
+  manualClientResults.appendChild(row);
+}
+function selectManualClient(item) {
+  var shouldResumeSubmit = resumeSubmitAfterClientSelection;
+  applyClientMatch(item);
+  closeManualClientModal();
+  if (shouldResumeSubmit && form) {
+    resumeSubmitAfterClientSelection = false;
+    setTimeout(function() {
+      if (form.requestSubmit) form.requestSubmit();
+      else form.dispatchEvent(new Event("submit", { cancelable: true }));
+    }, 0);
+  }
+}
+function renderManualClientResults(items) {
+  if (!manualClientResults) return;
+  manualClientResults.textContent = "";
+  if (!items.length) {
+    renderManualClientResultMessage("검색 결과가 없습니다. 거래처 추가를 눌러 직접 등록할 수 있습니다.");
+    return;
+  }
+  items.forEach(function(item) {
+    var button = document.createElement("button");
+    button.className = "client-suggestion" + (item.existing ? " is-existing" : "");
+    button.type = "button";
+    var title = document.createElement("span");
+    title.className = "client-suggestion-title";
+    var name = document.createElement("strong");
+    name.textContent = item.client || "-";
+    title.appendChild(name);
+    if (item.existing) {
+      var badge = document.createElement("span");
+      badge.className = "client-existing-badge";
+      badge.textContent = "기존 거래처";
+      title.appendChild(badge);
+    }
+    var code = document.createElement("code");
+    code.textContent = item.code || "";
+    var meta = document.createElement("small");
+    meta.textContent = clientSuggestionSubtitle(item);
+    button.appendChild(title);
+    button.appendChild(code);
+    button.appendChild(meta);
+    button.addEventListener("click", function() {
+      selectManualClient(item);
+    });
+    manualClientResults.appendChild(button);
+  });
+}
+async function loadManualClientResults() {
+  var term = clientLookupTerm(manualClientSearch ? manualClientSearch.value : "");
+  var seq = ++manualClientLookupSeq;
+  if (term.length < 2) {
+    renderManualClientResultMessage("두 글자 이상 입력하면 검색합니다.");
+    return;
+  }
+  renderManualClientResultMessage("검색 중입니다.");
+  try {
+    var params = new URLSearchParams();
+    params.set("q", term);
+    params.set("limit", "30");
+    applyClientLookupParams(params);
+    var result = await requestJson("/api/clients?" + params.toString(), { method: "GET" }, 10000);
+    if (seq !== manualClientLookupSeq) return;
+    renderManualClientResults(result.items || []);
+  } catch (error) {
+    if (seq !== manualClientLookupSeq) return;
+    renderManualClientResultMessage("거래처 목록을 불러오지 못했습니다.");
+  }
+}
+function scheduleManualClientLookup() {
+  if (manualClientLookupTimer) clearTimeout(manualClientLookupTimer);
+  manualClientLookupTimer = setTimeout(function() {
+    loadManualClientResults();
+  }, 180);
+}
+function setManualBranchOptions(branches, selected) {
+  if (!manualClientBranch) return;
+  manualClientBranch.textContent = "";
+  var empty = document.createElement("option");
+  empty.value = "";
+  empty.textContent = "지점 선택";
+  manualClientBranch.appendChild(empty);
+  var seen = {};
+  (branches || []).forEach(function(branch) {
+    var value = String(branch || "").trim();
+    var key = lookupKey(value);
+    if (!value || seen[key]) return;
+    seen[key] = true;
+    var option = document.createElement("option");
+    option.value = value;
+    option.textContent = value;
+    manualClientBranch.appendChild(option);
+  });
+  if (selected && !seen[lookupKey(selected)]) {
+    var selectedOption = document.createElement("option");
+    selectedOption.value = selected;
+    selectedOption.textContent = selected;
+    manualClientBranch.appendChild(selectedOption);
+  }
+  manualClientBranch.value = selected || "";
+}
+async function refreshManualBranchOptions(selected) {
+  setManualBranchOptions(manualBranchOptions, selected);
+  if (!manualBranchOptionsPromise) {
+    var params = new URLSearchParams();
+    params.set("branches", "1");
+    applyClientLookupParams(params);
+    manualBranchOptionsPromise = requestJson("/api/clients?" + params.toString(), { method: "GET" }, 10000)
+      .then(function(result) {
+        manualBranchOptions = result.branches || [];
+        return manualBranchOptions;
+      })
+      .catch(function() {
+        manualBranchOptions = [];
+        return manualBranchOptions;
+      })
+      .finally(function() {
+        manualBranchOptionsPromise = null;
+      });
+  }
+  var branches = await manualBranchOptionsPromise;
+  setManualBranchOptions(branches, selected);
+}
+function setManualAddPanelOpen(open) {
+  if (manualClientAddPanel) manualClientAddPanel.classList.toggle("active", Boolean(open));
+  if (manualClientAddToggleBtn) manualClientAddToggleBtn.textContent = open ? "추가 입력 닫기" : "거래처 추가";
+}
+function openManualClientModal(term, resumeSubmit, showAdd) {
   if (!manualClientOverlay) return;
   var value = normalizeClientName(term || (clientInput ? clientInput.value : ""));
   var isCode = /^\d{2,}$/.test(value.replace(/\s+/g, ""));
+  resumeSubmitAfterClientSelection = Boolean(resumeSubmit);
+  if (manualClientTitle) manualClientTitle.textContent = "거래처 선택";
+  if (manualClientHelp) manualClientHelp.textContent = "거래처가 선택되지 않았습니다. 아래 검색 결과에서 거래처를 선택해주세요.";
+  if (manualClientSearch) manualClientSearch.value = value;
   if (manualClientName) manualClientName.value = isCode ? "" : value;
   if (manualClientCode) manualClientCode.value = isCode ? value : "";
-  if (manualClientBranch) manualClientBranch.value = branchInput && branchInput.value ? branchInput.value : "";
+  setManualAddPanelOpen(Boolean(showAdd));
+  refreshManualBranchOptions(branchInput && branchInput.value ? branchInput.value : "").catch(function() {});
   manualClientOverlay.classList.add("active");
   manualClientOverlay.setAttribute("aria-hidden", "false");
+  loadManualClientResults();
   setTimeout(function() {
-    if (manualClientName && !manualClientName.value) manualClientName.focus();
+    if (manualClientSearch && !showAdd) manualClientSearch.focus();
+    else if (manualClientName && !manualClientName.value) manualClientName.focus();
     else if (manualClientBranch && !manualClientBranch.value) manualClientBranch.focus();
     else if (manualClientCode) manualClientCode.focus();
   }, 0);
@@ -772,6 +940,7 @@ function closeManualClientModal() {
   if (!manualClientOverlay) return;
   manualClientOverlay.classList.remove("active");
   manualClientOverlay.setAttribute("aria-hidden", "true");
+  resumeSubmitAfterClientSelection = false;
 }
 async function saveManualClient() {
   var client = manualClientName ? manualClientName.value.trim() : "";
@@ -794,8 +963,7 @@ async function saveManualClient() {
   var item = result.item || { client: client, branch: branch, code: code, existing: false };
   clientDirectory = [];
   clientDirectoryPromise = null;
-  applyClientMatch(item);
-  closeManualClientModal();
+  selectManualClient(item);
   showNotice("새 거래처를 등록했습니다.");
 }
 async function enrichReportsWithClientDirectory() {
@@ -4404,6 +4572,22 @@ if (manualClientSaveBtn) {
 if (manualClientCloseBtn) {
   manualClientCloseBtn.addEventListener("click", closeManualClientModal);
 }
+if (manualClientSearch) {
+  manualClientSearch.addEventListener("input", scheduleManualClientLookup);
+  manualClientSearch.addEventListener("keydown", function(e) {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      loadManualClientResults();
+    }
+  });
+}
+if (manualClientAddToggleBtn) {
+  manualClientAddToggleBtn.addEventListener("click", function() {
+    var isOpen = manualClientAddPanel && manualClientAddPanel.classList.contains("active");
+    setManualAddPanelOpen(!isOpen);
+    if (!isOpen && manualClientName) manualClientName.focus();
+  });
+}
 if (clientInput) {
   clientInput.addEventListener("input", function() {
     lastSelectedClientMatch = null;
@@ -4431,6 +4615,8 @@ ownerInput.addEventListener("change", function() {
   if (ownerNames.indexOf(owner) >= 0) {
     localStorage.setItem("ownerName", owner);
   }
+  manualBranchOptions = [];
+  manualBranchOptionsPromise = null;
   hideAllClientSuggestions();
   if (clientInput && clientLookupTerm(clientInput.value).length >= 2) {
     scheduleClientLookup("name");
@@ -4616,6 +4802,10 @@ form.addEventListener("submit", async function(e) {
     clientInput.focus();
     return;
   }
+  if (!hasClientSelectionForCurrentInput()) {
+    openManualClientModal(clientInput.value.trim(), true, false);
+    return;
+  }
   if (!productInput.value) {
     toast("품목을 선택해주세요.");
     if (productChooseBtn) productChooseBtn.focus();
@@ -4636,12 +4826,6 @@ form.addEventListener("submit", async function(e) {
   }
   if (isNonWorkingDateText(reportDate)) {
     showNotice("휴일에는 거래처 입력이 불가능합니다. 다른 날짜를 선택해주세요.", "danger");
-    return;
-  }
-  var lookupMatched = await autoApplyExactClientMatch();
-  if (/^\d{2,}$/.test(clientInput.value.trim()) && lookupMatched !== true) {
-    showNotice("입력한 거래처코드를 찾지 못했습니다. 후보 목록에서 거래처를 선택해주세요.", "danger");
-    clientInput.focus();
     return;
   }
 

@@ -389,6 +389,27 @@ function supabaseItemFromRow(row, existingKeys) {
   };
 }
 
+async function readSupabaseBranches(owner) {
+  const readyRows = await supabase("client_directory?select=id&limit=1");
+  if (!Array.isArray(readyRows) || !readyRows.length) {
+    return { ok: true, ready: false, reason: "client_directory is empty" };
+  }
+
+  if (owner) {
+    const ownerBranches = await supabase(`owner_branch_map?owner=eq.${encodeURIComponent(owner)}&select=branch_name&order=branch_name.asc&limit=300`);
+    const branches = uniqueValues(ownerBranches.map((row) => row.branch_name)).sort((a, b) => a.localeCompare(b, "ko"));
+    if (branches.length) return { ok: true, ready: true, branches, source: "supabase" };
+  }
+
+  const directoryRows = await supabasePaged("client_directory?select=branch_name&order=branch_name.asc");
+  return {
+    ok: true,
+    ready: true,
+    branches: uniqueValues(directoryRows.map((row) => row.branch_name)).sort((a, b) => a.localeCompare(b, "ko")),
+    source: "supabase"
+  };
+}
+
 function clientDirectoryRowFromInput(input) {
   const client = cleanCell(input.client || input.clientName);
   const branch = cleanCell(input.branch || input.branchName);
@@ -502,6 +523,7 @@ module.exports = async function handler(req, res) {
     const requestUrl = new URL(req.url, "http://localhost");
     const query = normalize(requestUrl.searchParams.get("q"));
     const includeAll = requestUrl.searchParams.get("all") === "1";
+    const wantBranches = requestUrl.searchParams.get("branches") === "1";
     const owner = cleanCell(requestUrl.searchParams.get("owner"));
     const limit = Math.max(1, Math.min(50, Number(requestUrl.searchParams.get("limit") || 20)));
 
@@ -512,6 +534,32 @@ module.exports = async function handler(req, res) {
 
     if (req.method !== "GET") {
       return json(res, 405, { error: "Method not allowed" });
+    }
+
+    if (wantBranches) {
+      const supabaseBranches = await readSupabaseBranches(owner)
+        .catch((error) => ({ ok: false, ready: false, error }));
+      if (supabaseBranches.ok && supabaseBranches.ready) {
+        return json(res, 200, {
+          ok: true,
+          branches: supabaseBranches.branches,
+          source: supabaseBranches.source || "supabase"
+        });
+      }
+
+      const [cimsCsv, statsCsv] = await Promise.all([
+        fetchSheetCsv(CIMS_SHEET_ID, CIMS_SHEET_GID, "CIMS"),
+        fetchSheetCsv(STATS_SHEET_ID, STATS_SHEET_GID, "전체처방통계").catch(() => "")
+      ]);
+      const cimsRows = rowsFromCimsCsv(cimsCsv);
+      const statsRows = statsCsv ? rowsFromStatsCsv(statsCsv) : [];
+      const ownerBranches = ownerBranchScope(owner, statsRows);
+      const scoped = scopeCimsRows(cimsRows, ownerBranches);
+      return json(res, 200, {
+        ok: true,
+        branches: uniqueValues(scoped.rows.map((item) => item.branch)).sort((a, b) => a.localeCompare(b, "ko")),
+        source: "sheet"
+      });
     }
 
     const supabaseResult = await readSupabaseLookup(owner, query, includeAll, limit)

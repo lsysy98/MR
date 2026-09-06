@@ -302,12 +302,42 @@
     .manual-client-head p { margin: 5px 0 0; color: var(--muted); font-size: 13px; line-height: 1.45; }
     .manual-client-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
     .manual-client-grid label:first-child { grid-column: 1 / -1; }
+    .manual-client-search-panel {
+      display: grid;
+      gap: 10px;
+    }
+    .manual-client-results {
+      display: grid;
+      gap: 7px;
+      max-height: 260px;
+      overflow: auto;
+      padding: 6px;
+      border: 1px solid #f1d7c4;
+      border-radius: 8px;
+      background: #fffaf6;
+    }
+    .manual-client-results .client-suggestion.empty { background: transparent; }
+    .manual-client-add-panel {
+      display: none;
+      gap: 12px;
+      padding-top: 12px;
+      border-top: 1px solid var(--line);
+    }
+    .manual-client-add-panel.active { display: grid; }
+    .manual-client-note {
+      margin: -4px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
     .manual-client-actions {
       display: flex;
       justify-content: flex-end;
       gap: 8px;
       padding-top: 2px;
     }
+    .manual-client-head > .btn,
+    .manual-client-actions .btn { white-space: nowrap; flex: 0 0 auto; }
     .product-select-btn {
       width: 100%;
       min-height: 44px;
@@ -2141,6 +2171,7 @@
       .input-panel, .dashboard, .today-panel, .meeting-panel { scroll-margin-top: 108px; }
       .manual-client-grid { grid-template-columns: 1fr; }
       .manual-client-actions { display: grid; grid-template-columns: 1fr; }
+      .manual-client-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; }
       .meeting-grid { grid-template-columns: 1fr; }
       .meeting-total { font-size: 20px; }
       .meeting-slide { padding: 12px; }
@@ -2434,18 +2465,30 @@
     <div class="manual-client-box" role="dialog" aria-modal="true" aria-labelledby="manualClientTitle">
       <div class="manual-client-head">
         <div>
-          <h3 id="manualClientTitle">새 거래처 등록</h3>
-          <p>CIMS에 아직 없는 거래처를 검색용 DB에 등록합니다.</p>
+          <h3 id="manualClientTitle">거래처 선택</h3>
+          <p id="manualClientHelp">거래처가 선택되지 않았습니다. 아래 검색 결과에서 거래처를 선택해주세요.</p>
         </div>
         <button class="btn" type="button" id="manualClientCloseBtn">닫기</button>
       </div>
-      <div class="manual-client-grid">
-        <label>치과명<input id="manualClientName" type="text" autocomplete="off"></label>
-        <label>지점<input id="manualClientBranch" type="text" autocomplete="off" placeholder="예: 서초지점"></label>
-        <label>거래처코드<input id="manualClientCode" type="text" inputmode="numeric" autocomplete="off" placeholder="알면 입력"></label>
+      <div class="manual-client-search-panel">
+        <label>검색어<input id="manualClientSearch" type="text" autocomplete="off" placeholder="치과명 또는 거래처코드"></label>
+        <div class="manual-client-results" id="manualClientResults" aria-live="polite"></div>
+        <button class="btn" type="button" id="manualClientAddToggleBtn">거래처 추가</button>
       </div>
-      <div class="manual-client-actions">
-        <button class="btn primary" type="button" id="manualClientSaveBtn">등록</button>
+      <div class="manual-client-add-panel" id="manualClientAddPanel">
+        <div class="manual-client-grid">
+        <label>치과명<input id="manualClientName" type="text" autocomplete="off"></label>
+          <label>지점
+            <select id="manualClientBranch">
+              <option value="">지점 선택</option>
+            </select>
+          </label>
+          <label>거래처코드<input id="manualClientCode" type="text" inputmode="numeric" autocomplete="off" placeholder="알면 입력"></label>
+        </div>
+        <p class="manual-client-note">거래처코드가 아직 없으면 적지 않아도 됩니다.</p>
+        <div class="manual-client-actions">
+          <button class="btn primary" type="button" id="manualClientSaveBtn">등록</button>
+        </div>
       </div>
     </div>
   </div>
@@ -2613,7 +2656,7 @@
       </div>
     </div>
   </div>
-  <script src="app.js?v=20260906-0010"></script>
+  <script src="app.js?v=20260907-0012"></script>
 </body>
 </html>
 
