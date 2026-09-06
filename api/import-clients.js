@@ -211,7 +211,8 @@ async function supabase(path, options = {}) {
     throw new Error("SUPABASE_URL must look like https://xxxx.supabase.co");
   }
 
-  const tableName = String(path).split("?")[0];
+  const methodName = String(options.method || "GET").toUpperCase();
+  const tableName = `${methodName} ${String(path).split("?")[0]}`;
   const attempts = 3;
   let lastError = null;
 
@@ -596,10 +597,6 @@ module.exports = async function handler(req, res) {
     const branchRows = ownerBranchRows(statsRows, now);
     const existingRows = existingClientRows(statsRows, now);
 
-    await supabase("client_directory?id=not.like.manual-%", {
-      method: "DELETE",
-      headers: { Prefer: "return=minimal" }
-    });
     await clearTable("owner_branch_map");
     await clearTable("existing_clients");
 
@@ -615,6 +612,7 @@ module.exports = async function handler(req, res) {
       clientDirectoryCount: directoryRows.length,
       ownerBranchCount: branchRows.length,
       existingClientCount: existingRows.length,
+      clientDirectoryMode: "upsert only",
       reportClientCodeBackfill: backfill,
       cimsRule: "CIMS K열이 지점으로 끝나고, 거래처명에 기공소가 없는 거래처만 저장했습니다."
     });

@@ -405,7 +405,9 @@ async function readSupabaseBranches(owner) {
   return {
     ok: true,
     ready: true,
-    branches: uniqueValues(directoryRows.map((row) => row.branch_name)).sort((a, b) => a.localeCompare(b, "ko")),
+    branches: uniqueValues(directoryRows
+      .map((row) => row.branch_name)
+      .filter(isCimsBranchAllowed)).sort((a, b) => a.localeCompare(b, "ko")),
     source: "supabase"
   };
 }
@@ -492,7 +494,7 @@ async function readSupabaseLookup(owner, query, includeAll, limit) {
   const existingRows = await supabasePaged("existing_clients?select=client_code,client_name");
   const existingKeys = existingKeySet(existingRows);
   let rows = directoryRows
-    .filter((row) => isClientAllowed(row.client_name))
+    .filter((row) => isClientAllowed(row.client_name) && isCimsBranchAllowed(row.branch_name))
     .map((row) => supabaseItemFromRow(row, existingKeys));
 
   if (query) {
