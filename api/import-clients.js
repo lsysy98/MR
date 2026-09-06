@@ -51,6 +51,14 @@ function normalize(value) {
   return cleanCell(value).replace(/\s+/g, "").toLowerCase();
 }
 
+function wait(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function isTransientSupabaseErrorText(text) {
+  return /<!doctype html|<html|cf-error-code|worker threw exception|cloudflare/i.test(String(text || ""));
+}
+
 function normalizeBranch(value) {
   return normalize(value)
     .replace(/[()（）\[\]{}]/g, "")
@@ -203,43 +211,62 @@ async function supabase(path, options = {}) {
     throw new Error("SUPABASE_URL must look like https://xxxx.supabase.co");
   }
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 20000);
-  let response;
-  try {
-    response = await fetch(`${baseUrl}/rest/v1/${path}`, {
-      ...options,
-      signal: controller.signal,
-      headers: {
-        apikey: SUPABASE_SERVICE_ROLE_KEY,
-        Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-        "Content-Type": "application/json",
-        Prefer: "return=representation",
-        ...(options.headers || {})
+  const tableName = String(path).split("?")[0];
+  const attempts = 3;
+  let lastError = null;
+
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 20000);
+    let response;
+    try {
+      response = await fetch(`${baseUrl}/rest/v1/${path}`, {
+        ...options,
+        signal: controller.signal,
+        headers: {
+          apikey: SUPABASE_SERVICE_ROLE_KEY,
+          Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+          "Content-Type": "application/json",
+          Prefer: "return=representation",
+          ...(options.headers || {})
+        }
+      });
+    } catch (error) {
+      clearTimeout(timer);
+      lastError = error.name === "AbortError"
+        ? new Error(`Supabase 응답이 너무 늦습니다. (${tableName})`)
+        : error;
+      if (attempt < attempts) {
+        await wait(350 * attempt);
+        continue;
       }
-    });
-  } catch (error) {
-    if (error.name === "AbortError") {
-      throw new Error("Supabase response timed out.");
+      throw lastError;
     }
-    throw error;
-  } finally {
+
     clearTimeout(timer);
+    const text = await response.text();
+    let data = null;
+    try {
+      data = text ? JSON.parse(text) : null;
+    } catch (error) {
+      data = text;
+    }
+
+    if (response.ok) return data;
+
+    if (isTransientSupabaseErrorText(text)) {
+      lastError = new Error(`Supabase가 일시 오류를 반환했습니다. 잠시 후 다시 실행해주세요. (${tableName}, HTTP ${response.status})`);
+      if (attempt < attempts) {
+        await wait(500 * attempt);
+        continue;
+      }
+      throw lastError;
+    }
+
+    throw new Error(data?.message || text || `Supabase request failed. (${tableName})`);
   }
 
-  const text = await response.text();
-  let data = null;
-  try {
-    data = text ? JSON.parse(text) : null;
-  } catch (error) {
-    data = text;
-  }
-
-  if (!response.ok) {
-    throw new Error(data?.message || text || "Supabase request failed.");
-  }
-
-  return data;
+  throw lastError || new Error(`Supabase request failed. (${tableName})`);
 }
 
 function directoryRow(item, now) {
@@ -529,7 +556,7 @@ async function clearTable(table) {
 }
 
 async function upsertRows(table, rows) {
-  const size = 400;
+  const size = 150;
   for (let i = 0; i < rows.length; i += size) {
     const chunk = rows.slice(i, i + size);
     if (!chunk.length) continue;
