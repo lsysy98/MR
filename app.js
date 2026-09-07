@@ -750,12 +750,24 @@ async function loadClientDirectory() {
   return clientDirectoryPromise;
 }
 function uniqueClientDirectoryMatch(report) {
-  if (!report || report.clientCode || !clientDirectory.length) return null;
+  if (!report || !clientDirectory.length) return null;
+  var branchText = itemBranchName(report);
+  var codeText = itemClientCode(report);
+  if (codeText) {
+    var codeMatches = clientDirectory.filter(function(item) {
+      return lookupKey(item.code) === lookupKey(codeText);
+    });
+    if (branchText) {
+      codeMatches = codeMatches.filter(function(item) {
+        return branchLooksSame(item.branch, branchText);
+      });
+    }
+    if (codeMatches.length === 1) return codeMatches[0];
+  }
   var clientMatches = clientDirectory.filter(function(item) {
     return reportClientLooksLikeDirectoryItem(report.client, item);
   });
   if (!clientMatches.length) return null;
-  var branchText = itemBranchName(report);
   if (branchText) {
     var branchMatches = clientMatches.filter(function(item) {
       return branchLooksSame(item.branch, branchText);
@@ -973,8 +985,9 @@ async function enrichReportsWithClientDirectory() {
     var match = uniqueClientDirectoryMatch(report);
     if (!match) return report;
     return Object.assign({}, report, {
+      client: match.client || report.client || "",
       clientCode: match.code || report.clientCode || "",
-      branchName: report.branchName || match.branch || "",
+      branchName: match.branch || report.branchName || "",
       existingClient: Boolean(match.existing)
     });
   });

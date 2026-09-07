@@ -475,7 +475,7 @@ async function supabasePaged(pathBase, pageSize = 1000, maxPages = 30) {
 }
 
 async function backfillReportClientCodes(directoryRows, branchRows, existingRows) {
-  const reportRows = await supabasePaged("reports?select=id,owner,client,branch_name,client_code&order=created_at.asc");
+  const reportRows = await supabasePaged("reports?select=id,report_date,owner,client,branch_name,client_code&order=created_at.asc");
   let updated = 0;
   let ambiguous = 0;
   let skipped = 0;
@@ -483,7 +483,22 @@ async function backfillReportClientCodes(directoryRows, branchRows, existingRows
   let directoryMatched = 0;
   let corrected = 0;
   let clearedWrongBranch = 0;
+  let renamed = 0;
   const unresolvedSamples = [];
+  const unresolvedByOwner = {};
+
+  function rememberUnresolved(report, reason) {
+    const owner = cleanCell(report.owner) || "담당자 미지정";
+    if (!unresolvedByOwner[owner]) unresolvedByOwner[owner] = [];
+    const item = {
+      date: report.report_date || "",
+      client: report.client || "",
+      branchName: report.branch_name || "",
+      reason
+    };
+    if (unresolvedByOwner[owner].length < 50) unresolvedByOwner[owner].push(item);
+    if (unresolvedSamples.length < 20) unresolvedSamples.push({ owner, ...item });
+  }
 
   for (const report of reportRows) {
     let source = "existing";
@@ -508,45 +523,47 @@ async function backfillReportClientCodes(directoryRows, branchRows, existingRows
         updated += 1;
         corrected += 1;
         clearedWrongBranch += 1;
+        rememberUnresolved(report, "지점과 맞지 않는 기존 코드를 제거함");
         continue;
       }
       if (currentCode) {
         skipped += 1;
       } else {
         ambiguous += 1;
-        if (unresolvedSamples.length < 20) {
-          unresolvedSamples.push({
-            owner: report.owner || "",
-            client: report.client || "",
-            branchName: report.branch_name || ""
-          });
-        }
+        rememberUnresolved(report, "거래처코드 후보를 하나로 특정하지 못함");
       }
       continue;
     }
     const nextCode = cleanCell(match.client_code);
     const nextBranch = cleanCell(match.branch_name || report.branch_name);
+    const nextClient = cleanCell(match.client_name || report.client);
     const currentBranch = cleanCell(report.branch_name);
+    const currentClient = cleanCell(report.client);
+    const clientAlreadyOk = !nextClient || currentClient === nextClient;
     if (currentCode && (!nextCode || normalize(currentCode) === normalize(nextCode)) &&
-        (!nextBranch || branchLooksSame(currentBranch, nextBranch) || currentBranch === nextBranch)) {
+        (!nextBranch || branchLooksSame(currentBranch, nextBranch) || currentBranch === nextBranch) &&
+        clientAlreadyOk) {
       skipped += 1;
       continue;
     }
+    const patchBody = {
+      client_code: nextCode || currentCode,
+      branch_name: nextBranch || currentBranch || ""
+    };
+    if (nextClient) patchBody.client = nextClient;
     await supabase(`reports?id=eq.${encodeURIComponent(report.id)}`, {
       method: "PATCH",
       headers: { Prefer: "return=minimal" },
-      body: JSON.stringify({
-        client_code: nextCode || currentCode,
-        branch_name: nextBranch || currentBranch || ""
-      })
+      body: JSON.stringify(patchBody)
     });
     updated += 1;
     if (currentCode && nextCode && normalize(currentCode) !== normalize(nextCode)) corrected += 1;
+    if (nextClient && currentClient !== nextClient) renamed += 1;
     if (source === "existing") existingMatched += 1;
     else directoryMatched += 1;
   }
 
-  return { total: reportRows.length, updated, corrected, clearedWrongBranch, existingMatched, directoryMatched, ambiguous, skipped, unresolvedSamples };
+  return { total: reportRows.length, updated, corrected, clearedWrongBranch, renamed, existingMatched, directoryMatched, ambiguous, skipped, unresolvedSamples, unresolvedByOwner };
 }
 
 async function clearTable(table) {

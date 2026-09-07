@@ -282,6 +282,8 @@
     .manual-client-overlay.active { display: flex; }
     .manual-client-box {
       width: min(560px, 100%);
+      max-height: calc(100dvh - 36px);
+      overflow: auto;
       display: grid;
       gap: 14px;
       padding: 18px;
@@ -291,12 +293,16 @@
       box-shadow: 0 22px 56px rgba(54, 34, 19, .26);
     }
     .manual-client-head {
+      position: sticky;
+      top: 0;
+      z-index: 2;
       display: flex;
       align-items: start;
       justify-content: space-between;
       gap: 12px;
       padding-bottom: 12px;
       border-bottom: 1px solid var(--line);
+      background: #fff;
     }
     .manual-client-head h3 { margin: 0; font-size: 18px; }
     .manual-client-head p { margin: 5px 0 0; color: var(--muted); font-size: 13px; line-height: 1.45; }
@@ -2172,6 +2178,8 @@
       .manual-client-grid { grid-template-columns: 1fr; }
       .manual-client-actions { display: grid; grid-template-columns: 1fr; }
       .manual-client-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; }
+      .manual-client-overlay { align-items: flex-start; padding: 10px; }
+      .manual-client-box { max-height: calc(100dvh - 20px); padding: 14px; }
       .meeting-grid { grid-template-columns: 1fr; }
       .meeting-total { font-size: 20px; }
       .meeting-slide { padding: 12px; }
@@ -2656,7 +2664,7 @@
       </div>
     </div>
   </div>
-  <script src="app.js?v=20260907-0012"></script>
+  <script src="app.js?v=20260907-0013"></script>
 </body>
 </html>
 
