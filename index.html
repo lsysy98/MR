@@ -27,7 +27,7 @@
     }
     body { margin: 0; background: var(--bg); color: var(--text); font-family: "Malgun Gothic", system-ui, sans-serif; }
     header { background: rgba(255,255,255,.96); border-bottom: 1px solid var(--line); padding: 14px 16px; position: sticky; top: 0; z-index: 5; box-shadow: 0 2px 14px rgba(120, 74, 36, .06); }
-    .header-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .header-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; max-width: 1120px; margin: 0 auto; }
     h1 { margin: 0; font-size: 19px; user-select: none; }
     .admin-menu-wrap {
       position: relative;
@@ -1146,7 +1146,14 @@
     .today-panel, .code-panel { grid-column: 2; }
     @media (min-width: 901px) {
       header { padding-left: 24px; padding-right: 24px; }
-      .header-top { max-width: 1560px; }
+      .header-top {
+        max-width: 1084px;
+        width: 100%;
+        display: grid;
+        grid-template-columns: minmax(340px, 430px) minmax(360px, 1fr) auto;
+        align-items: center;
+      }
+      .desktop-tabs { width: 100%; max-width: none; }
       main {
         max-width: 1560px;
         width: calc(100% - 48px);
