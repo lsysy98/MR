@@ -51,6 +51,7 @@ var adminMenuBtn = document.getElementById("adminMenuBtn");
 var adminMenu = document.getElementById("adminMenu");
 var menuHolidayBtn = document.getElementById("menuHolidayBtn");
 var menuExhibitionBtn = document.getElementById("menuExhibitionBtn");
+var menuCodeReviewBtn = document.getElementById("menuCodeReviewBtn");
 var ownerInput = document.getElementById("owner");
 var dateInput = document.getElementById("date");
 var clientCodeInput = document.getElementById("clientCode");
@@ -87,6 +88,9 @@ var ownerSearchButton = document.getElementById("ownerSearchBtn");
 var ownerSearchResults = document.getElementById("ownerSearchResults");
 var todayOwnerCards = document.getElementById("todayOwnerCards");
 var meetingCards = document.getElementById("meetingCards");
+var codeReviewList = document.getElementById("codeReviewList");
+var codeReviewSummary = document.getElementById("codeReviewSummary");
+var codeReviewEmpty = document.getElementById("codeReviewEmpty");
 var meetingMonthLabel = document.getElementById("meetingMonthLabel");
 var meetingMonthPicker = document.getElementById("meetingMonthPicker");
 var meetingPrevMonthBtn = document.getElementById("meetingPrevMonthBtn");
@@ -3513,6 +3517,116 @@ function renderOwnerCards(items) {
     ownerCards.appendChild(card);
   });
 }
+function shortReportDate(value) {
+  var text = String(value || "");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
+  return Number(text.slice(5, 7)) + "/" + Number(text.slice(8, 10));
+}
+function missingCodeGroups() {
+  var ownerMap = {};
+  ownerNames.forEach(function(owner) {
+    ownerMap[owner] = {};
+  });
+  reports.forEach(function(item) {
+    if (!item || ownerNames.indexOf(item.owner) < 0) return;
+    if (itemClientCode(item)) return;
+    var ownerBucket = ownerMap[item.owner];
+    var client = normalizeClientName(item.client) || "거래처명 없음";
+    var branch = itemBranchName(item) || "";
+    var key = clientCompareKey(client) + "|" + normalizeBranchKey(branch);
+    if (!ownerBucket[key]) {
+      ownerBucket[key] = {
+        client: client,
+        branch: branch,
+        amount: 0,
+        reportCount: 0,
+        dates: {},
+        types: {}
+      };
+    }
+    ownerBucket[key].amount += Number(item.amount || 0);
+    ownerBucket[key].reportCount += 1;
+    if (item.date) ownerBucket[key].dates[item.date] = true;
+    if (item.type) ownerBucket[key].types[item.type] = true;
+  });
+  return ownerNames.map(function(owner) {
+    var items = Object.keys(ownerMap[owner]).map(function(key) {
+      var item = ownerMap[owner][key];
+      item.dateTexts = Object.keys(item.dates).sort().map(shortReportDate);
+      item.typeTexts = Object.keys(item.types).sort(function(a, b) {
+        return (a === "신규" ? 0 : 1) - (b === "신규" ? 0 : 1);
+      });
+      return item;
+    }).sort(function(a, b) {
+      if (b.reportCount !== a.reportCount) return b.reportCount - a.reportCount;
+      if (b.amount !== a.amount) return b.amount - a.amount;
+      return a.client.localeCompare(b.client, "ko");
+    });
+    return { owner: owner, items: items };
+  }).filter(function(group) {
+    return group.items.length > 0;
+  });
+}
+function renderCodeReviewPanel() {
+  if (!codeReviewList) return;
+  codeReviewList.textContent = "";
+  var groups = missingCodeGroups();
+  var total = groups.reduce(function(sum, group) {
+    return sum + group.items.length;
+  }, 0);
+  if (codeReviewSummary) {
+    codeReviewSummary.textContent = "거래처코드 미지정 " + total + "곳";
+  }
+  if (codeReviewEmpty) {
+    codeReviewEmpty.style.display = total ? "none" : "block";
+  }
+  groups.forEach(function(group) {
+    var ownerCard = document.createElement("div");
+    ownerCard.className = "code-review-owner";
+
+    var head = document.createElement("div");
+    head.className = "code-review-owner-head";
+    var owner = document.createElement("strong");
+    owner.textContent = group.owner;
+    var count = document.createElement("span");
+    count.textContent = group.items.length + "곳";
+    head.appendChild(owner);
+    head.appendChild(count);
+
+    var rows = document.createElement("div");
+    rows.className = "code-review-rows";
+    group.items.forEach(function(item) {
+      var row = document.createElement("div");
+      row.className = "code-review-row";
+
+      var main = document.createElement("div");
+      main.className = "code-review-client";
+      var client = document.createElement("strong");
+      client.textContent = item.client;
+      main.appendChild(client);
+
+      var meta = document.createElement("div");
+      meta.className = "code-review-meta";
+      [item.branch || "지점 없음", item.typeTexts.join("/") || "구분 없음", item.dateTexts.join(", ") || "날짜 없음", "보고 " + item.reportCount + "건"].forEach(function(text) {
+        var span = document.createElement("span");
+        span.textContent = text;
+        meta.appendChild(span);
+      });
+      main.appendChild(meta);
+
+      var amount = document.createElement("div");
+      amount.className = "code-review-amount";
+      amount.textContent = won(item.amount);
+      row.appendChild(main);
+      row.appendChild(amount);
+      rows.appendChild(row);
+    });
+
+    ownerCard.appendChild(head);
+    ownerCard.appendChild(rows);
+    codeReviewList.appendChild(ownerCard);
+  });
+}
 function renderTeamCards(items) {
   if (!todayOwnerCards) return;
   todayOwnerCards.textContent = "";
@@ -4246,6 +4360,7 @@ function render() {
   document.getElementById("empty").style.display = items.length ? "none" : "block";
   renderOwnerCards(items);
   renderMeetingCards(items);
+  renderCodeReviewPanel();
 
   document.getElementById("todayTotalAmount").textContent = wonMan(teamSummary.total.amount);
   document.getElementById("todayTotalCount").textContent = teamSummary.total.count + "건";
@@ -4313,6 +4428,7 @@ function startEdit(item) {
   document.body.classList.remove("view-dashboard");
   document.body.classList.remove("view-today");
   document.body.classList.remove("view-meeting");
+  document.body.classList.remove("view-codes");
   document.querySelectorAll("[data-view]").forEach(function(tab) {
     tab.classList.toggle("active", tab.dataset.view === "form");
   });
@@ -4512,6 +4628,21 @@ if (menuExhibitionBtn) {
     });
   });
 }
+if (menuCodeReviewBtn) {
+  menuCodeReviewBtn.addEventListener("click", function() {
+    closeAdminMenu();
+    document.body.classList.remove("view-form");
+    document.body.classList.remove("view-dashboard");
+    document.body.classList.remove("view-today");
+    document.body.classList.remove("view-meeting");
+    document.body.classList.add("view-codes");
+    document.querySelectorAll("[data-view]").forEach(function(tab) {
+      tab.classList.toggle("active", tab.dataset.view === "codes");
+    });
+    var panel = document.getElementById("codePanel");
+    if (panel) panel.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+}
 document.addEventListener("click", function(e) {
   if (!adminMenu || !adminMenu.classList.contains("active")) return;
   if (e.target && e.target.closest && e.target.closest(".admin-menu-wrap")) return;
@@ -4675,6 +4806,7 @@ document.querySelectorAll("[data-view]").forEach(function(button) {
     document.body.classList.toggle("view-dashboard", view === "dashboard");
     document.body.classList.toggle("view-today", view === "today");
     document.body.classList.toggle("view-meeting", view === "meeting");
+    document.body.classList.toggle("view-codes", view === "codes");
     document.querySelectorAll("[data-view]").forEach(function(tab) {
       tab.classList.toggle("active", tab.dataset.view === view);
     });

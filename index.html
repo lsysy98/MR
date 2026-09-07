@@ -1119,7 +1119,7 @@
     .status.ok { border-color: #98d8bf; background: #ecf9f3; color: #0f5b47; }
     .status.error { border-color: #efb8b8; background: #fff1f1; color: #b42323; }
     .mobile-tabs { display: none; }
-    .today-panel { grid-column: 2; }
+    .today-panel, .code-panel { grid-column: 2; }
     .summary-title { margin: 2px 0 -2px; color: var(--muted); font-size: 14px; font-weight: 800; }
     .summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
     .metric { padding: 14px; min-height: 92px; display: grid; gap: 6px; align-content: space-between; }
@@ -1481,15 +1481,17 @@
       .header-settings { min-height: 32px; padding: 0 9px; font-size: 12px; }
       .header-menu-toggle { width: 38px; padding: 0; }
       .admin-menu { width: 142px; }
-      .mobile-tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 10px; padding: 4px; border: 1px solid #e5d4c6; border-radius: 8px; background: #fff7f0; }
+      .mobile-tabs { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; margin-top: 10px; padding: 4px; border: 1px solid #e5d4c6; border-radius: 8px; background: #fff7f0; }
       .mobile-tab { min-height: 38px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); font-weight: 800; cursor: pointer; }
       .mobile-tab.active { background: var(--green); color: #fff; }
       main { display: block; padding: 14px 12px 24px; }
-      body.view-dashboard .input-panel, body.view-dashboard .today-panel { display: none; }
-      body.view-form .dashboard, body.view-form .today-panel { display: none; }
-      body.view-today .input-panel, body.view-today .dashboard { display: none; }
-      .input-panel, .dashboard, .today-panel { scroll-margin-top: 108px; }
-      .dashboard, .today-panel { margin-top: 0; }
+      body.view-dashboard .input-panel, body.view-dashboard .today-panel, body.view-dashboard .meeting-panel, body.view-dashboard .code-panel { display: none; }
+      body.view-form .dashboard, body.view-form .today-panel, body.view-form .meeting-panel, body.view-form .code-panel { display: none; }
+      body.view-today .input-panel, body.view-today .dashboard, body.view-today .meeting-panel, body.view-today .code-panel { display: none; }
+      body.view-meeting .input-panel, body.view-meeting .dashboard, body.view-meeting .today-panel, body.view-meeting .code-panel { display: none; }
+      body.view-codes .input-panel, body.view-codes .dashboard, body.view-codes .today-panel, body.view-codes .meeting-panel { display: none; }
+      .input-panel, .dashboard, .today-panel, .meeting-panel, .code-panel { scroll-margin-top: 108px; }
+      .dashboard, .today-panel, .meeting-panel, .code-panel { margin-top: 0; }
       .summary { grid-template-columns: 1fr 1fr; }
       .head.with-search { grid-template-columns: 1fr; }
       .row, .month-nav, .month-main { grid-template-columns: 1fr; }
@@ -1630,6 +1632,7 @@
     }
     .success-case-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
     .meeting-panel { grid-column: 2; }
+    .code-panel { grid-column: 2; }
     .meeting-month-nav { margin-bottom: 12px; }
     #meetingMonthPicker { font-weight: 800; text-align: center; }
     .meeting-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
@@ -1658,6 +1661,73 @@
     .meeting-counts, .meeting-products, .meeting-cases { color: var(--muted); font-size: 12px; line-height: 1.45; }
     .meeting-products { display: grid; gap: 2px; }
     .meeting-cases { border-top: 1px solid var(--line); padding-top: 7px; white-space: pre-wrap; }
+    .code-review-headline {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    .code-review-headline .summary-title { margin: 0; }
+    .code-review-help { color: var(--muted); font-size: 12px; font-weight: 700; text-align: right; }
+    .code-review-list { display: grid; gap: 10px; }
+    .code-review-owner {
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      box-shadow: 0 8px 18px rgba(95, 58, 27, .06);
+    }
+    .code-review-owner-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 11px 12px;
+      background: #fff7f0;
+      border-bottom: 1px solid var(--line);
+    }
+    .code-review-owner-head strong { font-size: 15px; }
+    .code-review-owner-head span {
+      min-width: 38px;
+      border-radius: 999px;
+      padding: 4px 8px;
+      background: #fff;
+      color: var(--green);
+      font-size: 12px;
+      font-weight: 900;
+      text-align: center;
+      white-space: nowrap;
+    }
+    .code-review-rows { display: grid; }
+    .code-review-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 10px;
+      align-items: center;
+      padding: 10px 12px;
+      border-top: 1px solid #f2e2d7;
+    }
+    .code-review-row:first-child { border-top: 0; }
+    .code-review-client { display: grid; gap: 5px; min-width: 0; }
+    .code-review-client strong { color: var(--text); font-size: 15px; line-height: 1.25; overflow-wrap: anywhere; }
+    .code-review-meta {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+    }
+    .code-review-meta span {
+      min-height: 21px;
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      padding: 0 7px;
+      background: #fffaf6;
+    }
+    .code-review-amount { color: var(--text); font-size: 15px; font-weight: 900; white-space: nowrap; text-align: right; }
     .meeting-slide {
       display: grid;
       gap: 12px;
@@ -2169,12 +2239,18 @@
     .presentation-client-amount { color: #201a16; font-size: 22px !important; }
     .presentation-empty { color: var(--muted); font-size: 14px; padding: 10px; border: 1px dashed var(--line); border-radius: 8px; }
     @media (max-width: 900px) {
-      .mobile-tabs { grid-template-columns: repeat(4, 1fr); }
-      body.view-dashboard .input-panel, body.view-dashboard .today-panel, body.view-dashboard .meeting-panel { display: none; }
-      body.view-form .dashboard, body.view-form .today-panel, body.view-form .meeting-panel { display: none; }
-      body.view-today .input-panel, body.view-today .dashboard, body.view-today .meeting-panel { display: none; }
-      body.view-meeting .input-panel, body.view-meeting .dashboard, body.view-meeting .today-panel { display: none; }
-      .input-panel, .dashboard, .today-panel, .meeting-panel { scroll-margin-top: 108px; }
+      .mobile-tabs { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; }
+      .mobile-tab { padding: 0 3px; font-size: 13px; white-space: nowrap; }
+      body.view-dashboard .input-panel, body.view-dashboard .today-panel, body.view-dashboard .meeting-panel, body.view-dashboard .code-panel { display: none; }
+      body.view-form .dashboard, body.view-form .today-panel, body.view-form .meeting-panel, body.view-form .code-panel { display: none; }
+      body.view-today .input-panel, body.view-today .dashboard, body.view-today .meeting-panel, body.view-today .code-panel { display: none; }
+      body.view-meeting .input-panel, body.view-meeting .dashboard, body.view-meeting .today-panel, body.view-meeting .code-panel { display: none; }
+      body.view-codes .input-panel, body.view-codes .dashboard, body.view-codes .today-panel, body.view-codes .meeting-panel { display: none; }
+      .input-panel, .dashboard, .today-panel, .meeting-panel, .code-panel { scroll-margin-top: 108px; }
+      .code-review-headline { display: grid; align-items: start; }
+      .code-review-help { text-align: left; }
+      .code-review-row { grid-template-columns: 1fr; gap: 6px; }
+      .code-review-amount { text-align: left; }
       .manual-client-grid { grid-template-columns: 1fr; }
       .manual-client-actions { display: grid; grid-template-columns: 1fr; }
       .manual-client-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; }
@@ -2254,6 +2330,7 @@
         <div class="admin-menu" id="adminMenu" aria-hidden="true">
           <button type="button" id="menuHolidayBtn">휴일 설정</button>
           <button type="button" id="menuExhibitionBtn">전시회 참석</button>
+          <button type="button" id="menuCodeReviewBtn">코드 확인</button>
         </div>
       </div>
     </div>
@@ -2262,6 +2339,7 @@
       <button class="mobile-tab" type="button" data-view="dashboard">월간현황</button>
       <button class="mobile-tab" type="button" data-view="today">일일현황</button>
       <button class="mobile-tab" type="button" data-view="meeting">회의자료</button>
+      <button class="mobile-tab" type="button" data-view="codes">코드확인</button>
     </div>
   </header>
   <main>
@@ -2435,6 +2513,20 @@
             </div>
           </div>
           <div class="meeting-grid" id="meetingCards"></div>
+        </div>
+      </section>
+    </section>
+
+    <section class="code-panel" id="codePanel">
+      <section>
+        <div class="head"><h2>코드확인</h2></div>
+        <div class="body">
+          <div class="code-review-headline">
+            <div class="summary-title" id="codeReviewSummary">거래처코드 미지정 0곳</div>
+            <div class="code-review-help">CIMS 기준으로 자동 매칭되지 않은 보고만 표시됩니다.</div>
+          </div>
+          <div class="code-review-list" id="codeReviewList"></div>
+          <div class="empty" id="codeReviewEmpty">거래처코드가 비어 있는 보고가 없습니다.</div>
         </div>
       </section>
     </section>
@@ -2664,7 +2756,7 @@
       </div>
     </div>
   </div>
-  <script src="app.js?v=20260907-0013"></script>
+  <script src="app.js?v=20260907-0014"></script>
 </body>
 </html>
 
