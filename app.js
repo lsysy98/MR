@@ -674,7 +674,7 @@ function scheduleClientLookup(mode) {
   if (clientLookupTimer) clearTimeout(clientLookupTimer);
   clientLookupTimer = setTimeout(function() {
     loadClientSuggestions(mode);
-  }, 220);
+  }, 300);
 }
 function clearClientCode() {
   lastSelectedClientMatch = null;
@@ -1622,12 +1622,15 @@ async function loadExhibitions() {
 }
 async function loadData() {
   status("보고 데이터를 불러오는 중입니다.", "");
-  await loadCalendarDays(true);
-  reports = await api("GET");
-  await enrichReportsWithClientDirectory();
+  var loaded = await Promise.all([
+    api("GET"),
+    loadCalendarDays(true),
+    loadCompletionsForSelectedDate(true),
+    loadExhibitions()
+  ]);
+  reports = loaded[0];
   status("", "");
   render();
-  loadCompletionsForSelectedDate();
 }
 async function addData(item, skipNotice) {
   var saved = await api("POST", item);
@@ -3596,8 +3599,21 @@ function renderCodeReviewPanel() {
     var rows = document.createElement("div");
     rows.className = "code-review-rows";
     group.items.forEach(function(item) {
-      var row = document.createElement("div");
+      var row = document.createElement("button");
+      row.type = "button";
       row.className = "code-review-row";
+      row.addEventListener("click", function() {
+        if (ownerInput) {
+          ownerInput.value = group.owner;
+          localStorage.setItem("ownerName", group.owner);
+        }
+        if (clientInput) clientInput.value = item.client || "";
+        if (clientCodeInput) clientCodeInput.value = "";
+        if (branchInput) branchInput.value = item.branch || "";
+        lastSelectedClientMatch = null;
+        clearClientMatchStatus();
+        openManualClientModal(item.client || "", false, false);
+      });
 
       var main = document.createElement("div");
       main.className = "code-review-client";
@@ -4405,6 +4421,39 @@ function resetFormAll() {
   updateAmountPreview();
   document.getElementById("submitBtn").textContent = "저장";
 }
+var viewNames = ["form", "dashboard", "today", "meeting", "codes", "daily-work", "monthly-work"];
+function isDesktopLayout() {
+  return !window.matchMedia || window.matchMedia("(min-width: 901px)").matches;
+}
+function normalizeViewForLayout(view) {
+  if (isDesktopLayout()) {
+    if (!view || view === "form" || view === "daily-work") return "today";
+    if (view === "monthly-work") return "dashboard";
+    return view;
+  }
+  if (view === "daily-work") return "form";
+  if (view === "monthly-work") return "dashboard";
+  return view || "form";
+}
+function activeViewName() {
+  for (var i = 0; i < viewNames.length; i += 1) {
+    if (document.body.classList.contains("view-" + viewNames[i])) return viewNames[i];
+  }
+  return "";
+}
+function setActiveView(view, scrollTop) {
+  var normalized = normalizeViewForLayout(view);
+  viewNames.forEach(function(name) {
+    document.body.classList.toggle("view-" + name, name === normalized);
+  });
+  document.querySelectorAll("[data-view]").forEach(function(tab) {
+    tab.classList.toggle("active", tab.dataset.view === normalized);
+  });
+  if (scrollTop) window.scrollTo({ top: 0, behavior: "smooth" });
+}
+function syncViewForLayout() {
+  setActiveView(activeViewName(), false);
+}
 function startEdit(item) {
   editingId = item.id;
   ownerInput.value = item.owner;
@@ -4424,17 +4473,11 @@ function startEdit(item) {
   updateTypeButtons();
   updateAmountPreview();
   document.getElementById("submitBtn").textContent = "수정 저장";
-  document.body.classList.add("view-form");
-  document.body.classList.remove("view-dashboard");
-  document.body.classList.remove("view-today");
-  document.body.classList.remove("view-meeting");
-  document.body.classList.remove("view-codes");
-  document.querySelectorAll("[data-view]").forEach(function(tab) {
-    tab.classList.toggle("active", tab.dataset.view === "form");
-  });
+  setActiveView(isDesktopLayout() ? "today" : "form", false);
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
+syncViewForLayout();
 syncCollectionButtons();
 syncTeamPeriodControls();
 updateProductSelectionSummary();
@@ -4631,16 +4674,7 @@ if (menuExhibitionBtn) {
 if (menuCodeReviewBtn) {
   menuCodeReviewBtn.addEventListener("click", function() {
     closeAdminMenu();
-    document.body.classList.remove("view-form");
-    document.body.classList.remove("view-dashboard");
-    document.body.classList.remove("view-today");
-    document.body.classList.remove("view-meeting");
-    document.body.classList.add("view-codes");
-    document.querySelectorAll("[data-view]").forEach(function(tab) {
-      tab.classList.toggle("active", tab.dataset.view === "codes");
-    });
-    var panel = document.getElementById("codePanel");
-    if (panel) panel.scrollIntoView({ behavior: "smooth", block: "start" });
+    setActiveView("codes", true);
   });
 }
 document.addEventListener("click", function(e) {
@@ -4801,17 +4835,15 @@ if (meetingCurrentMonthBtn) {
 document.getElementById("cancelEditBtn").addEventListener("click", resetFormAll);
 document.querySelectorAll("[data-view]").forEach(function(button) {
   button.addEventListener("click", function() {
-    var view = button.dataset.view;
-    document.body.classList.toggle("view-form", view === "form");
-    document.body.classList.toggle("view-dashboard", view === "dashboard");
-    document.body.classList.toggle("view-today", view === "today");
-    document.body.classList.toggle("view-meeting", view === "meeting");
-    document.body.classList.toggle("view-codes", view === "codes");
-    document.querySelectorAll("[data-view]").forEach(function(tab) {
-      tab.classList.toggle("active", tab.dataset.view === view);
-    });
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    setActiveView(button.dataset.view, true);
   });
+});
+var lastDesktopLayout = isDesktopLayout();
+window.addEventListener("resize", function() {
+  var nextDesktopLayout = isDesktopLayout();
+  if (nextDesktopLayout === lastDesktopLayout) return;
+  lastDesktopLayout = nextDesktopLayout;
+  syncViewForLayout();
 });
 if (ownerSearchInput) {
   ownerSearchInput.addEventListener("input", function() {

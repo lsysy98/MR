@@ -6,6 +6,15 @@ const DEFAULT_STATS_SHEET_ID = "18g8f_EtcBQ7bMTg8rwnkHUsMxmHFAxoAz7hcF9weFm8";
 const DEFAULT_STATS_SHEET_GID = "627148657";
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const LOOKUP_CACHE_TTL_MS = 5 * 60 * 1000;
+const lookupCache = {
+  directoryReady: null,
+  directoryReadyUntil: 0,
+  existingKeys: null,
+  existingKeysUntil: 0,
+  existingKeysPromise: null,
+  ownerBranchRows: new Map()
+};
 
 const CIMS_SHEET_ID =
   process.env.CIMS_SHEET_ID ||
@@ -390,13 +399,13 @@ function supabaseItemFromRow(row, existingKeys) {
 }
 
 async function readSupabaseBranches(owner) {
-  const readyRows = await supabase("client_directory?select=id&limit=1");
-  if (!Array.isArray(readyRows) || !readyRows.length) {
+  const directoryReady = await hasClientDirectoryRows();
+  if (!directoryReady) {
     return { ok: true, ready: false, reason: "client_directory is empty" };
   }
 
   if (owner) {
-    const ownerBranches = await supabase(`owner_branch_map?owner=eq.${encodeURIComponent(owner)}&select=branch_name&order=branch_name.asc&limit=300`);
+    const ownerBranches = await readCachedOwnerBranchRows(owner);
     const branches = uniqueValues(ownerBranches.map((row) => row.branch_name)).sort((a, b) => a.localeCompare(b, "ko"));
     if (branches.length) return { ok: true, ready: true, branches, source: "supabase" };
   }
@@ -440,6 +449,8 @@ async function saveManualClient(input) {
     headers: { Prefer: "resolution=merge-duplicates,return=representation" },
     body: JSON.stringify(row)
   });
+  lookupCache.directoryReady = true;
+  lookupCache.directoryReadyUntil = Date.now() + LOOKUP_CACHE_TTL_MS;
   const saved = Array.isArray(rows) && rows[0] ? rows[0] : row;
   return {
     code: saved.client_code || "",
@@ -461,18 +472,78 @@ async function supabasePaged(pathBase, pageSize = 1000, maxPages = 30) {
   return rows;
 }
 
-async function readSupabaseLookup(owner, query, includeAll, limit) {
+async function hasClientDirectoryRows() {
+  const now = Date.now();
+  if (lookupCache.directoryReady !== null && lookupCache.directoryReadyUntil > now) {
+    return lookupCache.directoryReady;
+  }
+
   const readyRows = await supabase("client_directory?select=id&limit=1");
-  if (!Array.isArray(readyRows) || !readyRows.length) {
+  const ready = Array.isArray(readyRows) && readyRows.length > 0;
+  lookupCache.directoryReady = ready;
+  lookupCache.directoryReadyUntil = now + (ready ? LOOKUP_CACHE_TTL_MS : 5000);
+  return ready;
+}
+
+async function readCachedOwnerBranchRows(owner) {
+  const key = normalizeOwner(owner);
+  if (!key) return [];
+
+  const cached = lookupCache.ownerBranchRows.get(key);
+  if (cached && cached.expiresAt > Date.now()) return cached.rows;
+
+  const rows = await supabase(`owner_branch_map?owner=eq.${encodeURIComponent(owner)}&select=branch_name,branch_key&order=branch_name.asc&limit=300`);
+  lookupCache.ownerBranchRows.set(key, {
+    expiresAt: Date.now() + LOOKUP_CACHE_TTL_MS,
+    rows
+  });
+  return rows;
+}
+
+async function readCachedExistingKeys() {
+  const now = Date.now();
+  if (lookupCache.existingKeys && lookupCache.existingKeysUntil > now) {
+    return lookupCache.existingKeys;
+  }
+  if (lookupCache.existingKeysPromise) return lookupCache.existingKeysPromise;
+
+  lookupCache.existingKeysPromise = supabasePaged("existing_clients?select=client_code,client_name,branch_name")
+    .then((rows) => {
+      const keys = existingKeySet(rows);
+      lookupCache.existingKeys = keys;
+      lookupCache.existingKeysUntil = Date.now() + LOOKUP_CACHE_TTL_MS;
+      return keys;
+    })
+    .finally(() => {
+      lookupCache.existingKeysPromise = null;
+    });
+
+  return lookupCache.existingKeysPromise;
+}
+
+async function readSupabaseLookup(owner, query, includeAll, limit) {
+  const directoryReady = await hasClientDirectoryRows();
+  if (!directoryReady) {
     return { ok: true, ready: false, reason: "client_directory is empty" };
   }
 
-  const ownerBranches = owner
-    ? await supabase(`owner_branch_map?owner=eq.${encodeURIComponent(owner)}&select=branch_name,branch_key&order=branch_name.asc&limit=200`)
-    : [];
+  const ownerBranches = owner ? await readCachedOwnerBranchRows(owner) : [];
   const branchKeys = ownerBranches
     .map((row) => normalizeBranch(row.branch_key || row.branch_name))
     .filter(Boolean);
+
+  if (!query && !includeAll) {
+    return {
+      ok: true,
+      ready: true,
+      source: "supabase",
+      rows: [],
+      ownerBranches: branchKeys,
+      branchMatchedCount: 0,
+      directoryCount: 0,
+      existingCount: lookupCache.existingKeys ? lookupCache.existingKeys.size : 0
+    };
+  }
 
   const filters = [
     "select=id,client_code,client_name,branch_name,branch_key,search_text,sort_order",
@@ -491,8 +562,7 @@ async function readSupabaseLookup(owner, query, includeAll, limit) {
   const directoryRows = includeAll
     ? await supabasePaged(rowPath)
     : await supabase(`${rowPath}&limit=${Math.max(50, limit * 3)}`);
-  const existingRows = await supabasePaged("existing_clients?select=client_code,client_name");
-  const existingKeys = existingKeySet(existingRows);
+  const existingKeys = await readCachedExistingKeys();
   let rows = directoryRows
     .filter((row) => isClientAllowed(row.client_name) && isCimsBranchAllowed(row.branch_name))
     .map((row) => supabaseItemFromRow(row, existingKeys));
@@ -516,7 +586,7 @@ async function readSupabaseLookup(owner, query, includeAll, limit) {
     ownerBranches: branchKeys,
     branchMatchedCount: directoryRows.length,
     directoryCount: directoryRows.length,
-    existingCount: existingRows.length
+    existingCount: existingKeys.size
   };
 }
 

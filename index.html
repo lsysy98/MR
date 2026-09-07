@@ -1118,8 +1118,71 @@
     .status { border: 1px solid #cbd8d1; border-radius: 8px; padding: 10px 12px; background: #fbfdfc; color: var(--muted); font-size: 13px; }
     .status.ok { border-color: #98d8bf; background: #ecf9f3; color: #0f5b47; }
     .status.error { border-color: #efb8b8; background: #fff1f1; color: #b42323; }
+    .desktop-tabs {
+      flex: 1;
+      max-width: 720px;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 6px;
+      padding: 4px;
+      border: 1px solid #e5d4c6;
+      border-radius: 8px;
+      background: #fff7f0;
+    }
     .mobile-tabs { display: none; }
     .today-panel, .code-panel { grid-column: 2; }
+    @media (min-width: 901px) {
+      header { padding-left: 24px; padding-right: 24px; }
+      .header-top { max-width: 1560px; }
+      main {
+        max-width: 1560px;
+        width: calc(100% - 48px);
+        padding: 18px 0 30px;
+      }
+      body.view-dashboard main,
+      body.view-today main,
+      body.view-meeting main,
+      body.view-codes main,
+      body.view-daily-work main,
+      body.view-monthly-work main { grid-template-columns: minmax(340px, 430px) minmax(0, 1fr); align-items: start; }
+      body.view-dashboard main,
+      body.view-today main,
+      body.view-meeting main,
+      body.view-codes main {
+        grid-template-columns: minmax(340px, 430px) minmax(520px, 640px);
+        justify-content: center;
+      }
+      body.view-form main { grid-template-columns: minmax(360px, 560px); justify-content: center; }
+      body.view-daily-work .dashboard, body.view-daily-work .meeting-panel, body.view-daily-work .code-panel { display: none; }
+      body.view-monthly-work .today-panel, body.view-monthly-work .meeting-panel, body.view-monthly-work .code-panel { display: none; }
+      body.view-dashboard .today-panel, body.view-dashboard .meeting-panel, body.view-dashboard .code-panel { display: none; }
+      body.view-form .dashboard, body.view-form .today-panel, body.view-form .meeting-panel, body.view-form .code-panel { display: none; }
+      body.view-today .dashboard, body.view-today .meeting-panel, body.view-today .code-panel { display: none; }
+      body.view-meeting .dashboard, body.view-meeting .today-panel, body.view-meeting .code-panel { display: none; }
+      body.view-codes .dashboard, body.view-codes .today-panel, body.view-codes .meeting-panel { display: none; }
+      .dashboard, .today-panel, .meeting-panel, .code-panel { grid-column: auto; }
+      body.view-daily-work .input-panel { grid-column: 1; }
+      body.view-daily-work .today-panel { grid-column: 2; }
+      body.view-dashboard .dashboard,
+      body.view-today .today-panel,
+      body.view-meeting .meeting-panel,
+      body.view-codes .code-panel { grid-column: 2; }
+      body.view-monthly-work .dashboard { grid-column: 1; }
+      body.view-monthly-work .meeting-panel { grid-column: 2; }
+      .dashboard > section,
+      .today-panel > section,
+      .meeting-panel > section,
+      .code-panel > section { min-height: 0; }
+      .summary { grid-template-columns: repeat(4, minmax(180px, 1fr)); }
+      .meeting-grid:not(.meeting-slide-mode) { grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
+      .dashboard,
+      .today-panel,
+      .code-panel,
+      .meeting-panel { max-width: 640px; width: 100%; }
+      .meeting-slide { max-width: 560px; margin: 0 auto; }
+      .code-review-list { grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); }
+      .code-review-owner { align-self: start; }
+    }
     .summary-title { margin: 2px 0 -2px; color: var(--muted); font-size: 14px; font-weight: 800; }
     .summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
     .metric { padding: 14px; min-height: 92px; display: grid; gap: 6px; align-content: space-between; }
@@ -1481,7 +1544,8 @@
       .header-settings { min-height: 32px; padding: 0 9px; font-size: 12px; }
       .header-menu-toggle { width: 38px; padding: 0; }
       .admin-menu { width: 142px; }
-      .mobile-tabs { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; margin-top: 10px; padding: 4px; border: 1px solid #e5d4c6; border-radius: 8px; background: #fff7f0; }
+      .desktop-tabs { display: none; }
+      .mobile-tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; margin-top: 10px; padding: 4px; border: 1px solid #e5d4c6; border-radius: 8px; background: #fff7f0; }
       .mobile-tab { min-height: 38px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); font-weight: 800; cursor: pointer; }
       .mobile-tab.active { background: var(--green); color: #fff; }
       main { display: block; padding: 14px 12px 24px; }
@@ -1636,7 +1700,7 @@
     .meeting-month-nav { margin-bottom: 12px; }
     #meetingMonthPicker { font-weight: 800; text-align: center; }
     .meeting-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-    .meeting-grid.meeting-slide-mode { grid-template-columns: 1fr; }
+    .meeting-grid.meeting-slide-mode { grid-template-columns: 1fr; justify-items: center; }
     .meeting-owner-card {
       border: 1px solid var(--line);
       border-radius: 8px;
@@ -1705,10 +1769,18 @@
       grid-template-columns: minmax(0, 1fr) auto;
       gap: 10px;
       align-items: center;
+      width: 100%;
       padding: 10px 12px;
+      border: 0;
       border-top: 1px solid #f2e2d7;
+      background: #fff;
+      color: inherit;
+      font: inherit;
+      text-align: left;
+      cursor: pointer;
     }
     .code-review-row:first-child { border-top: 0; }
+    .code-review-row:hover { background: #fff7f0; }
     .code-review-client { display: grid; gap: 5px; min-width: 0; }
     .code-review-client strong { color: var(--text); font-size: 15px; line-height: 1.25; overflow-wrap: anywhere; }
     .code-review-meta {
@@ -2239,7 +2311,7 @@
     .presentation-client-amount { color: #201a16; font-size: 22px !important; }
     .presentation-empty { color: var(--muted); font-size: 14px; padding: 10px; border: 1px dashed var(--line); border-radius: 8px; }
     @media (max-width: 900px) {
-      .mobile-tabs { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; }
+      .mobile-tabs { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
       .mobile-tab { padding: 0 3px; font-size: 13px; white-space: nowrap; }
       body.view-dashboard .input-panel, body.view-dashboard .today-panel, body.view-dashboard .meeting-panel, body.view-dashboard .code-panel { display: none; }
       body.view-form .dashboard, body.view-form .today-panel, body.view-form .meeting-panel, body.view-form .code-panel { display: none; }
@@ -2321,6 +2393,11 @@
   <header>
     <div class="header-top">
       <h1 id="appTitle">MR수도권팀 일일보고</h1>
+      <div class="desktop-tabs" aria-label="화면 선택">
+        <button class="mobile-tab" type="button" data-view="dashboard">월간현황</button>
+        <button class="mobile-tab active" type="button" data-view="today">일일현황</button>
+        <button class="mobile-tab" type="button" data-view="meeting">회의자료</button>
+      </div>
       <div class="admin-menu-wrap">
         <button class="header-settings header-menu-toggle" type="button" id="adminMenuBtn" aria-label="메뉴" aria-expanded="false">
           <span class="menu-bar" aria-hidden="true"></span>
@@ -2339,7 +2416,6 @@
       <button class="mobile-tab" type="button" data-view="dashboard">월간현황</button>
       <button class="mobile-tab" type="button" data-view="today">일일현황</button>
       <button class="mobile-tab" type="button" data-view="meeting">회의자료</button>
-      <button class="mobile-tab" type="button" data-view="codes">코드확인</button>
     </div>
   </header>
   <main>
@@ -2756,7 +2832,7 @@
       </div>
     </div>
   </div>
-  <script src="app.js?v=20260907-0014"></script>
+  <script src="app.js?v=20260908-0015"></script>
 </body>
 </html>
 
