@@ -1130,6 +1130,19 @@
       background: #fff7f0;
     }
     .mobile-tabs { display: none; }
+    .mobile-tab {
+      min-height: 38px;
+      border: 0;
+      border-radius: 6px;
+      background: transparent;
+      color: var(--muted);
+      font-weight: 800;
+      cursor: pointer;
+      white-space: nowrap;
+      appearance: none;
+      box-shadow: none;
+    }
+    .mobile-tab.active { background: var(--green); color: #fff; }
     .today-panel, .code-panel { grid-column: 2; }
     @media (min-width: 901px) {
       header { padding-left: 24px; padding-right: 24px; }
