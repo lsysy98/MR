@@ -609,6 +609,17 @@ function applyClientMatch(item) {
   setClientMatchStatus(item);
   hideAllClientSuggestions();
 }
+function rememberEditedClientMatch(item) {
+  var match = {
+    client: item.client || "",
+    code: item.clientCode || "",
+    branch: item.branchName || "",
+    existing: Boolean(item.existingClient)
+  };
+  if (!match.client && !match.code && !match.branch) return;
+  lastSelectedClientMatch = match;
+  setClientMatchStatus(match);
+}
 function renderClientSuggestions(box, items, mode) {
   if (!box) return;
   box.textContent = "";
@@ -4462,6 +4473,7 @@ function startEdit(item) {
   if (clientCodeInput) clientCodeInput.value = item.clientCode || "";
   clientInput.value = item.client;
   if (branchInput) branchInput.value = item.branchName || "";
+  rememberEditedClientMatch(item);
   productInput.value = item.product || "";
   updateProductSelectionSummary();
   renderProductOptions();
@@ -4473,7 +4485,7 @@ function startEdit(item) {
   updateTypeButtons();
   updateAmountPreview();
   document.getElementById("submitBtn").textContent = "수정 저장";
-  setActiveView(isDesktopLayout() ? "today" : "form", false);
+  if (!isDesktopLayout()) setActiveView("form", false);
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
