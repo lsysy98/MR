@@ -1,5 +1,11 @@
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const ADMIN_KEY = process.env.ADMIN_KEY || "";
+const {
+  hasSalesPlanConfig,
+  notifyDailyReportChange,
+  retryPendingSalesPlanEvents
+} = require("./sales-plan-integration");
 
 function cleanSupabaseUrl() {
   if (!SUPABASE_URL) return "";
@@ -169,10 +175,20 @@ module.exports = async function handler(req, res) {
         ok: true,
         hasSupabaseUrl: Boolean(baseUrl),
         hasServiceRoleKey: Boolean(SUPABASE_SERVICE_ROLE_KEY),
+        hasSalesPlanIntegrationUrl: Boolean(process.env.SALES_PLAN_INTEGRATION_URL),
+        hasSalesPlanIntegrationApiKey: Boolean(process.env.SALES_PLAN_INTEGRATION_API_KEY),
+        salesPlanIntegrationReady: hasSalesPlanConfig(),
         supabaseUrlLooksRight: /^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(baseUrl),
         supabaseUrlStart: baseUrl ? baseUrl.slice(0, 28) : "",
         message: "Both values must be true. Do not share the service role key."
       });
+    }
+
+    if (req.method === "GET" && requestUrl.searchParams.get("retrySalesPlan") === "1") {
+      const key = requestUrl.searchParams.get("key") || "";
+      if (!ADMIN_KEY || key !== ADMIN_KEY) return json(res, 401, { ok: false, error: "unauthorized" });
+      const result = await retryPendingSalesPlanEvents(supabase, 25);
+      return json(res, 200, { ok: true, result });
     }
 
     if (req.method === "GET") {
@@ -189,6 +205,7 @@ module.exports = async function handler(req, res) {
       const rows = await writeReport("reports", "POST", item);
       const saved = fromDb(rows[0]);
       if (!saved.clientCode && item.clientCode) saved.clientCode = item.clientCode;
+      await notifyDailyReportChange(supabase, "create_or_update", saved);
       return json(res, 201, saved);
     }
 
@@ -201,6 +218,7 @@ module.exports = async function handler(req, res) {
       await writeLog("update", actor, oldRows[0] || null, rows[0] || null);
       const saved = fromDb(rows[0]);
       if (!saved.clientCode && item.clientCode) saved.clientCode = item.clientCode;
+      await notifyDailyReportChange(supabase, "create_or_update", saved);
       return json(res, 200, saved);
     }
 
@@ -213,6 +231,7 @@ module.exports = async function handler(req, res) {
         const oldRows = await supabase(`reports?id=eq.${encodeURIComponent(id)}&select=*`);
         await supabase(`reports?id=eq.${encodeURIComponent(id)}`, { method: "DELETE" });
         await writeLog("delete", actor, oldRows[0] || null, null);
+        await notifyDailyReportChange(supabase, "delete", { id, updatedAt: Date.now() });
       }
       return json(res, 200, { ok: true, count: ids.length });
     }
