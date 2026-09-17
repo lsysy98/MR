@@ -223,26 +223,7 @@ function findCimsHeaderIndex(rows) {
 }
 
 function rowsFromCimsCsv(text) {
-  const rawRows = parseCsv(text).map((row) => row.map(cleanCell));
-  const headerIndex = findCimsHeaderIndex(rawRows);
-  const seen = new Set();
-  return rawRows
-    .map((row, index) => ({
-      index,
-      code: cleanCell(row[0]),
-      client: cleanCell(row[1]),
-      branch: cleanCell(row[10])
-    }))
-    .filter((item) => {
-      if (item.index === headerIndex) return false;
-      if (!item.client) return false;
-      if (!isClientAllowed(item.client)) return false;
-      if (!isCimsBranchAllowed(item.branch)) return false;
-      const key = item.code ? `code:${normalize(item.code)}` : `client:${normalize(item.client)}:${normalize(item.branch)}`;
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
+  return require('../lib/cims-policy').analyzeCims(parseCsv(text)).allowed;
 }
 
 function rowsFromStatsCsv(text) {

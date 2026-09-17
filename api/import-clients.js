@@ -138,26 +138,7 @@ function findCimsHeaderIndex(rows) {
 }
 
 function rowsFromCimsCsv(text) {
-  const rawRows = parseCsv(text).map((row) => row.map(cleanCell));
-  const headerIndex = findCimsHeaderIndex(rawRows);
-  const seen = new Set();
-  return rawRows
-    .map((row, index) => ({
-      index,
-      code: cleanCell(row[0]),
-      client: cleanCell(row[1]),
-      branch: cleanCell(row[10])
-    }))
-    .filter((item) => {
-      if (item.index === headerIndex) return false;
-      if (!item.client) return false;
-      if (!isClientAllowed(item.client)) return false;
-      if (!isCimsBranchAllowed(item.branch)) return false;
-      const key = item.code ? `code:${normalize(item.code)}` : `client:${normalize(item.client)}:${normalize(item.branch)}`;
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
+  return require('../lib/cims-policy').analyzeCims(parseCsv(text)).allowed;
 }
 
 function rowsFromStatsCsv(text) {
@@ -589,7 +570,7 @@ async function upsertRows(table, rows) {
 module.exports = async function handler(req, res) {
   try {
     const requestUrl = new URL(req.url, "http://localhost");
-    const key = requestUrl.searchParams.get("key") || "";
+    const key = String(req.headers?.authorization || '').replace(/^Bearer /, '') || requestUrl.searchParams.get("key") || "";
 
     if (req.method !== "GET" && req.method !== "POST") {
       return json(res, 405, { error: "Method not allowed" });
@@ -601,6 +582,10 @@ module.exports = async function handler(req, res) {
 
     if (key !== ADMIN_KEY) {
       return json(res, 401, { error: "관리자 비밀번호가 맞지 않습니다." });
+    }
+
+    if (requestUrl.searchParams.get('mode') === 'cleanup') {
+      return json(res, 410, { error: '사이트 내 거래처 정리 기능은 종료되었습니다. 기존 데이터는 변경하지 않았습니다.' });
     }
 
     const [cimsCsv, statsCsv] = await Promise.all([
@@ -631,7 +616,7 @@ module.exports = async function handler(req, res) {
       existingClientCount: existingRows.length,
       clientDirectoryMode: "upsert only",
       reportClientCodeBackfill: backfill,
-      cimsRule: "CIMS K열이 지점으로 끝나고, 거래처명에 기공소가 없는 거래처만 저장했습니다."
+      cimsRule: "지점 거래처 중 기공소, 폐업, 오스템 담당 거래처를 제외했습니다. 기존 검색 데이터는 자동 삭제하지 않습니다."
     });
   } catch (error) {
     return json(res, 500, { error: error.message });

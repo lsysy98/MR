@@ -5,6 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta http-equiv="Cache-Control" content="no-store">
   <title>MR수도권팀 일일보고</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icons/report-192.png">
+  <meta name="theme-color" content="#ffffff">
+  <link rel="stylesheet" href="site-tools.css?v=20260918-notifications-2">
   <style>
     * { box-sizing: border-box; }
     :root {
@@ -2452,6 +2456,7 @@
           <button type="button" id="menuHolidayBtn">휴일 설정</button>
           <button type="button" id="menuExhibitionBtn">전시회 참석</button>
           <button type="button" id="menuCodeReviewBtn">코드 확인</button>
+          <button type="button" id="menuNotificationsBtn">알림 설정</button>
         </div>
       </div>
     </div>
@@ -2877,6 +2882,20 @@
     </div>
   </div>
   <script src="app.js?v=20260910-0021"></script>
+  <div class="test-tools-overlay" id="notificationsOverlay" hidden>
+    <section class="test-tools-dialog" role="dialog" aria-modal="true" aria-labelledby="notificationsTitle">
+      <header><h2 id="notificationsTitle">일일보고 알림</h2><button class="btn" type="button" data-tools-close>닫기</button></header>
+      <div class="test-tools-body">
+        <label>이 기기의 담당자<select id="notificationOwner"><option value="">본인 이름 선택</option></select></label>
+        <label class="notification-time">알림 시간 (한국시간)<input id="notificationTime" type="time" value="18:00" step="60" required></label>
+        <dl class="notification-details"><div><dt>대상</dt><dd>당일 보고 미완료</dd></div><div><dt>제외</dt><dd>휴일 · 연차 · 보고 완료</dd></div></dl>
+        <p class="tools-status" id="notificationStatus" role="status">알림 연결 확인 중</p>
+        <p class="tools-status" id="notificationIosHint" hidden>아이폰은 Safari에서 공유 → 홈 화면에 추가 후, 추가한 아이콘으로 열어주세요.</p>
+      </div>
+      <footer><button class="btn primary" type="button" id="notificationEnable" disabled>알림 받기</button><div class="tools-actions"><button class="btn" type="button" id="notificationTest" disabled>시험 알림</button><button class="btn" type="button" id="notificationDisable" disabled>이 기기 알림 해제</button></div></footer>
+    </section>
+  </div>
+  <script src="site-tools.js?v=20260918-notifications-2"></script>
 </body>
 </html>
 
