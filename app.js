@@ -1779,21 +1779,33 @@ function teamPeriodItems() {
     return item.date === selectedTeamDate;
   });
 }
-function dateRangeItems(range) {
+function weeklyReportTodayText() {
+  var parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit"
+  }).formatToParts(new Date());
+  var values = {};
+  parts.forEach(function(part) { values[part.type] = part.value; });
+  return values.year + "-" + values.month + "-" + values.day;
+}
+function dateRangeItems(range, asOfDate) {
+  var cutoff = asOfDate || weeklyReportTodayText();
   return reports.filter(function(item) {
     return ownerNames.indexOf(item.owner) >= 0 &&
       item.date >= range.start &&
       item.date <= range.end &&
+      item.date <= cutoff &&
       isBusinessDate(parseDateText(item.date));
   });
 }
-function reportDateMonthItems(year, month) {
+function reportDateMonthItems(year, month, asOfDate) {
   var start = dateText(new Date(year, month - 1, 1));
   var end = dateText(new Date(year, month, 0));
+  var cutoff = asOfDate || weeklyReportTodayText();
   return reports.filter(function(item) {
     return ownerNames.indexOf(item.owner) >= 0 &&
       item.date >= start &&
-      item.date <= end;
+      item.date <= end &&
+      item.date <= cutoff;
   });
 }
 function koreanMonthDay(value, includeMonth) {
@@ -1839,9 +1851,10 @@ async function refreshWeeklyLeaveRows() {
 }
 function weeklyReportText() {
   var range = weeklyReportRange();
-  var weekItems = dateRangeItems(range);
+  var asOfDate = weeklyReportTodayText();
+  var weekItems = dateRangeItems(range, asOfDate);
   var weekSummary = summarize(weekItems);
-  var monthItems = reportDateMonthItems(range.year, range.month);
+  var monthItems = reportDateMonthItems(range.year, range.month, asOfDate);
   var monthSummary = summarize(monthItems);
   var targetAmount = ownerCount() * 2000000;
   var startDate = parseDateText(range.start);
