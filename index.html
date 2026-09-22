@@ -2436,55 +2436,70 @@
     }
 
   </style>
+  <link rel="stylesheet" href="workspace.css?v=20260923-readable-details-12">
 </head>
-<body class="view-form">
-  <header>
+<body class="view-form workspace">
+  <header class="workspace-topbar">
     <div class="header-top">
-      <h1 id="appTitle">MR수도권팀 일일보고</h1>
-      <div class="desktop-tabs" aria-label="화면 선택">
-        <button class="mobile-tab" type="button" data-view="dashboard">월간현황</button>
-        <button class="mobile-tab active" type="button" data-view="today">일일현황</button>
-        <button class="mobile-tab" type="button" data-view="meeting">회의자료</button>
+      <div class="workspace-brand">
+        <span class="brand-mark" aria-label="표랑이"><span class="osstem-mascot"><img class="official-osstem-mascot" src="https://play-lh.googleusercontent.com/v5hMvoQxdCMPa39JEfdonOInJDxmmm5I00EodMXU6bP9uRUpGnwxMgluVXdkrcmaMLERgC_ZAueIFDbWKULfCTU=w96-h96-rw" alt=""><i class="mascot-eyes"></i><i class="mascot-mouth"></i></span></span>
+        <h1 id="appTitle">MR <span>일일보고</span></h1>
       </div>
+      <div class="workspace-team"><span>수도권팀</span></div>
+      <div class="workspace-profile" id="workspaceProfile"><span class="profile-avatar" aria-hidden="true">MR</span><span id="workspaceOwner">담당자 미선택</span></div>
       <div class="admin-menu-wrap">
-        <button class="header-settings header-menu-toggle" type="button" id="adminMenuBtn" aria-label="메뉴" aria-expanded="false">
-          <span class="menu-bar" aria-hidden="true"></span>
-          <span class="menu-bar" aria-hidden="true"></span>
-          <span class="menu-bar" aria-hidden="true"></span>
+        <button class="header-settings header-menu-toggle" type="button" id="adminMenuBtn" aria-label="메뉴" aria-expanded="false" title="메뉴">
+          <i data-icon="menu" aria-hidden="true"></i>
         </button>
         <div class="admin-menu" id="adminMenu" aria-hidden="true">
-          <button type="button" id="menuHolidayBtn">휴일 설정</button>
-          <button type="button" id="menuExhibitionBtn">전시회 참석</button>
-          <button type="button" id="menuCodeReviewBtn">코드 확인</button>
-          <button type="button" id="menuNotificationsBtn">알림 설정</button>
+          <button type="button" id="menuHolidayBtn"><i data-icon="calendar-off" aria-hidden="true"></i>휴일 설정</button>
+          <button type="button" id="menuExhibitionBtn"><i data-icon="users" aria-hidden="true"></i>전시회 참석</button>
+          <button type="button" id="menuCodeReviewBtn"><i data-icon="scan-line" aria-hidden="true"></i>코드 확인</button>
+          <button type="button" id="menuNotificationsBtn"><i data-icon="bell" aria-hidden="true"></i>알림 설정</button>
         </div>
       </div>
     </div>
     <div class="mobile-tabs" aria-label="화면 선택">
-      <button class="mobile-tab active" type="button" data-view="form">작성하기</button>
-      <button class="mobile-tab" type="button" data-view="dashboard">월간현황</button>
-      <button class="mobile-tab" type="button" data-view="today">일일현황</button>
-      <button class="mobile-tab" type="button" data-view="meeting">회의자료</button>
+      <button class="mobile-tab active" type="button" data-view="form"><i data-icon="pen-line" aria-hidden="true"></i><span>작성하기</span></button>
+      <button class="mobile-tab" type="button" data-view="today"><i data-icon="calendar-days" aria-hidden="true"></i><span>일일현황</span></button>
+      <button class="mobile-tab" type="button" data-view="dashboard"><i data-icon="chart-no-axes-combined" aria-hidden="true"></i><span>월간현황</span></button>
+      <button class="mobile-tab" type="button" data-view="meeting"><i data-icon="presentation" aria-hidden="true"></i><span>회의자료</span></button>
     </div>
   </header>
+  <aside class="workspace-sidebar" aria-label="주 메뉴">
+    <div class="sidebar-caption">워크스페이스</div>
+    <nav class="desktop-tabs" aria-label="화면 선택">
+      <button class="mobile-tab active" type="button" data-view="today" title="일일현황"><i data-icon="calendar-days" aria-hidden="true"></i><span>일일현황</span></button>
+      <button class="mobile-tab" type="button" data-view="dashboard" title="월간현황"><i data-icon="chart-no-axes-combined" aria-hidden="true"></i><span>월간현황</span></button>
+      <button class="mobile-tab" type="button" data-view="meeting" title="회의자료"><i data-icon="presentation" aria-hidden="true"></i><span>회의자료</span></button>
+    </nav>
+    <div class="sidebar-team"><i data-icon="briefcase-business" aria-hidden="true"></i><div><strong>MR 수도권팀</strong><span>일일보고 워크스페이스</span></div></div>
+  </aside>
+  <div class="workspace-main">
+  <div class="workspace-heading">
+    <div><div class="workspace-eyebrow">수도권팀 <span>/</span> <span id="workspaceSection">보고 현황</span></div><h2 id="workspaceTitle">일일현황</h2></div>
+    <div class="workspace-date"><i data-icon="calendar-days" aria-hidden="true"></i><span id="workspaceDate"></span></div>
+  </div>
   <main>
     <section class="input-panel">
-      <div class="head"><h2>거래처 입력</h2></div>
+      <div class="head input-head"><div class="input-heading-icon"><i data-icon="pen-line" aria-hidden="true"></i></div><h2>보고 작성</h2><span class="draft-mode" id="workspaceDraftMode">새 보고</span></div>
       <form class="form" id="reportForm">
-        <label>담당자 이름
+        <div class="form-identity">
+        <label>담당자
           <select id="owner" required>
             <option value="">선택</option>
             <option value="성진욱">성진욱</option>
             <option value="김무영">김무영</option>
-            <option value="이승엽">이승엽</option>
             <option value="김태홍">김태홍</option>
+            <option value="이승엽">이승엽</option>
             <option value="제성규">제성규</option>
             <option value="송진영">송진영</option>
             <option value="이현욱">이현욱</option>
           </select>
         </label>
         <label>날짜 <span class="date-input-wrap"><input id="date" type="text" readonly required></span></label>
-        <label class="autocomplete-field">거래처 입력
+        </div>
+        <label class="autocomplete-field">거래처
           <input id="client" type="text" required autocomplete="off" placeholder="치과명 또는 거래처코드">
           <input id="clientCode" type="hidden">
           <input id="branchName" type="hidden">
@@ -2527,14 +2542,14 @@
           <button class="btn" type="button" data-add-amount="100">+100만</button>
         </div>
         <div class="helper" id="amountPreview">1 입력 = 1만원</div>
-        <button class="btn primary" id="submitBtn" type="submit">저장</button>
-        <button class="btn" id="cancelEditBtn" type="button">입력 초기화</button>
+        <div class="form-actions"><button class="btn primary" id="submitBtn" type="submit">저장</button>
+        <button class="btn" id="cancelEditBtn" type="button">입력 초기화</button></div>
         <div class="toast" id="toast"></div>
       </form>
     </section>
 
     <section class="dashboard" id="dashboard">
-      <section>
+      <section class="dashboard-toolbar">
         <div class="head with-search">
           <h2>담당자별 현황</h2>
           <div class="owner-search-control">
@@ -2542,24 +2557,19 @@
             <button class="btn owner-search-btn" id="ownerSearchBtn" type="button">검색</button>
           </div>
         </div>
-        <div class="body">
-          <div class="status" id="statusBox">보고 데이터를 불러오는 중입니다.</div>
-          <div class="month-nav">
-            <div class="month-main">
-              <input id="monthPicker" type="month" aria-label="월 선택">
+        <div class="month-nav">
+          <div class="period-navigation month-control">
+            <button class="btn" type="button" id="prevMonthBtn">전 달</button>
+            <div class="month-picker-shell">
+              <button class="month-picker-label" id="monthPickerLabel" type="button" aria-label="월 선택" title="월 선택"><span>2026. 09</span></button>
+              <input class="month-picker-input" id="monthPicker" type="month" aria-label="월 선택" tabindex="-1">
             </div>
-            <div class="month-actions">
-              <button class="btn" type="button" id="prevMonthBtn">전 달</button>
-              <button class="btn" type="button" id="currentMonthBtn">현재</button>
-              <button class="btn" type="button" id="nextMonthBtn">다음 달</button>
-            </div>
+            <button class="btn" type="button" id="nextMonthBtn">다음 달</button>
           </div>
-          <div class="owner-search-results" id="ownerSearchResults" aria-live="polite"></div>
-          <div class="owner-grid" id="ownerCards"></div>
-          <div class="empty" id="empty">아직 입력된 보고가 없습니다.</div>
         </div>
+        <div class="status" id="statusBox">보고 데이터를 불러오는 중입니다.</div>
       </section>
-      <div class="body">
+      <div class="body monthly-summary">
         <div class="summary-title">월 전체 요약</div>
         <div class="summary">
           <div class="metric"><span>전체</span><strong id="totalAmount">0원</strong><small id="totalCount">0건</small></div>
@@ -2568,44 +2578,49 @@
           <div class="metric"><span>목표 달성율</span><strong id="doneRate">0%</strong><small id="doneCount">총매출 0원 / 목표 0원</small></div>
         </div>
       </div>
+      <section class="dashboard-owner-list">
+        <div class="body">
+          <div class="owner-search-results" id="ownerSearchResults" aria-live="polite"></div>
+          <div class="owner-grid" id="ownerCards"></div>
+          <div class="empty" id="empty">아직 입력된 보고가 없습니다.</div>
+        </div>
+      </section>
     </section>
 
     <section class="today-panel" id="todayPanel">
       <section>
-        <div class="head"><h2>일일현황</h2></div>
+        <div class="head with-search"><h2>보고 현황</h2><div class="owner-search-control daily-owner-search-control">
+          <input class="owner-search" id="desktopOwnerSearchInput" type="search" placeholder="거래처 검색" autocomplete="off" aria-label="거래처 검색">
+          <button class="btn owner-search-btn" id="desktopOwnerSearchBtn" type="button">검색</button>
+        </div></div>
         <div class="body">
+          <div class="view-toolbar">
           <div class="seg period-switch">
             <button type="button" class="active" data-period="day">일간</button>
             <button type="button" data-period="week">주간</button>
           </div>
           <div class="period-controls">
-            <div class="day-control" id="teamDayControl">
-              <button class="btn" type="button" id="prevDayBtn">이전 일</button>
-              <div class="date-pick-wrap">
-                <button class="date-label" type="button" id="teamDateLabel">2026. 07. 01. 수</button>
-                <input class="hidden-date" id="teamDatePicker" type="date" aria-label="일일현황 날짜 선택">
+            <div class="period-control-row">
+              <div class="day-control period-navigation" id="teamDayControl">
+                <button class="btn" type="button" id="prevDayBtn">이전 일</button>
+                <div class="date-pick-wrap">
+                  <button class="date-label" type="button" id="teamDateLabel">2026. 07. 01. 수</button>
+                  <input class="hidden-date" id="teamDatePicker" type="date" aria-label="일일현황 날짜 선택">
+                </div>
+                <button class="btn" type="button" id="nextDayBtn">다음 일</button>
               </div>
-              <button class="btn" type="button" id="nextDayBtn">다음 일</button>
-            </div>
-            <div class="week-control" id="teamWeekControl">
-              <button class="btn" type="button" id="prevWeekBtn">이전 주</button>
-              <div class="date-pick-wrap">
-                <button class="week-label" type="button" id="teamWeekLabel">7월 1주차</button>
-                <input class="hidden-date" id="teamWeekPicker" type="date" aria-label="일일현황 주차 선택">
+              <div class="week-control period-navigation" id="teamWeekControl">
+                <button class="btn" type="button" id="prevWeekBtn">이전 주</button>
+                <div class="date-pick-wrap">
+                  <button class="week-label" type="button" id="teamWeekLabel">7월 1주차</button>
+                  <input class="hidden-date" id="teamWeekPicker" type="date" aria-label="일일현황 주차 선택">
+                </div>
+                <button class="btn" type="button" id="nextWeekBtn">다음 주</button>
               </div>
-              <button class="btn" type="button" id="nextWeekBtn">다음 주</button>
             </div>
           </div>
-          <div class="summary">
-            <div class="metric"><span>전체</span><strong id="todayTotalAmount">0원</strong><small id="todayTotalCount">0건</small></div>
-            <div class="metric"><span>신규</span><strong id="todayNewAmount">0원</strong><small id="todayNewCount">0건</small></div>
-            <div class="metric"><span>매출증대</span><strong id="todayGrowthAmount">0원</strong><small id="todayGrowthCount">0건</small></div>
           </div>
-          <div class="owner-grid" id="todayOwnerCards"></div>
-          <div class="empty" id="todayEmpty">오늘 입력된 보고가 없습니다.</div>
-          <div class="weekly-report-tools" id="weeklyReportTools">
-            <button class="btn primary" type="button" id="copyWeeklyReportBtn">카톡 문구 복사</button>
-          </div>
+          <div class="owner-search-results desktop-daily-search-results" id="desktopOwnerSearchResults" aria-live="polite"></div>
           <div class="completion-panel" id="completionPanel">
             <div class="completion-summary" id="completionSummary">
               <strong id="completionCount">완료 0/7</strong>
@@ -2618,6 +2633,17 @@
               <button class="btn" type="button" id="weekScreenshotBtn">스크린샷 저장</button>
             </div>
           </div>
+          <div class="summary">
+            <div class="metric"><span>전체</span><strong id="todayTotalAmount">0원</strong><small id="todayTotalCount">0건</small></div>
+            <div class="metric"><span>신규</span><strong id="todayNewAmount">0원</strong><small id="todayNewCount">0건</small></div>
+            <div class="metric"><span>매출증대</span><strong id="todayGrowthAmount">0원</strong><small id="todayGrowthCount">0건</small></div>
+          </div>
+          <div class="team-list-heading"><h3>담당자별 보고</h3><span id="workspaceCompletion" aria-live="polite"></span></div>
+          <div class="owner-grid" id="todayOwnerCards"></div>
+          <div class="empty" id="todayEmpty">오늘 입력된 보고가 없습니다.</div>
+          <div class="weekly-report-tools" id="weeklyReportTools">
+            <button class="btn primary" type="button" id="copyWeeklyReportBtn">카톡 문구 복사</button>
+          </div>
         </div>
       </section>
     </section>
@@ -2626,17 +2652,17 @@
       <section>
         <div class="head"><h2>회의자료</h2></div>
         <div class="body">
-          <div class="summary-title" id="meetingMonthLabel">이번 달 실적</div>
           <div class="month-nav meeting-month-nav">
-            <div class="month-main">
-              <input id="meetingMonthPicker" type="month" aria-label="회의자료 월 선택">
-            </div>
-            <div class="month-actions">
+            <div class="period-navigation month-control">
               <button class="btn" type="button" id="meetingPrevMonthBtn">전 월</button>
-              <button class="btn" type="button" id="meetingCurrentMonthBtn">현재</button>
+              <div class="month-picker-shell">
+                <button class="month-picker-label" id="meetingMonthPickerLabel" type="button" aria-label="회의자료 월 선택" title="월 선택"><span>2026. 09</span></button>
+                <input class="month-picker-input" id="meetingMonthPicker" type="month" aria-label="회의자료 월 선택" tabindex="-1">
+              </div>
               <button class="btn" type="button" id="meetingNextMonthBtn">다음 월</button>
             </div>
           </div>
+          <div class="summary-title" id="meetingMonthLabel">이번 달 실적</div>
           <div class="meeting-grid" id="meetingCards"></div>
         </div>
       </section>
@@ -2662,6 +2688,7 @@
     <span>made by 이승엽</span>
     <span>문의 <a href="mailto:homerun@osstem.com">homerun@osstem.com</a></span>
   </footer>
+  </div>
 
   <div class="product-overlay" id="productOverlay" aria-hidden="true">
     <div class="product-box" role="dialog" aria-modal="true" aria-labelledby="productOverlayTitle">
@@ -2783,7 +2810,7 @@
   </div>
   <div class="exhibition-overlay" id="exhibitionOverlay" aria-hidden="true">
     <div class="exhibition-box" role="dialog" aria-modal="true" aria-labelledby="exhibitionTitle">
-      <h3 id="exhibitionTitle">전시회 참석</h3>
+      <div class="dialog-heading"><h3 id="exhibitionTitle">전시회 참석</h3><button class="btn" type="button" id="exhibitionCloseBtn">닫기</button></div>
       <p>전시회 하나에 여러 날짜를 넣고, 날짜별 참석자를 따로 지정합니다.</p>
       <div class="exhibition-top-actions">
         <button class="btn primary" type="button" id="exhibitionFormToggleBtn">행사 입력</button>
@@ -2827,7 +2854,6 @@
       <div class="exhibition-actions" id="exhibitionActions">
         <button class="btn primary" type="button" id="exhibitionSaveBtn">저장</button>
         <button class="btn" type="button" id="exhibitionResetBtn">입력 초기화</button>
-        <button class="btn wide" type="button" id="exhibitionCloseBtn">닫기</button>
       </div>
     </div>
   </div>
@@ -2881,7 +2907,6 @@
       </div>
     </div>
   </div>
-  <script src="app.js?v=20260922-weekly-period-end-2"></script>
   <div class="test-tools-overlay" id="notificationsOverlay" hidden>
     <section class="test-tools-dialog" role="dialog" aria-modal="true" aria-labelledby="notificationsTitle">
       <header><h2 id="notificationsTitle">일일보고 알림</h2><button class="btn" type="button" data-tools-close>닫기</button></header>
@@ -2895,7 +2920,9 @@
       <footer><button class="btn primary" type="button" id="notificationEnable" disabled>알림 받기</button><div class="tools-actions"><button class="btn" type="button" id="notificationTest" disabled>시험 알림</button><button class="btn" type="button" id="notificationDisable" disabled>이 기기 알림 해제</button></div></footer>
     </section>
   </div>
+  <script src="app.js?v=20260923-readable-details-12"></script>
   <script src="site-tools.js?v=20260918-notifications-2"></script>
+  <script src="workspace.js?v=20260923-period-navigation-11"></script>
 </body>
 </html>
 
