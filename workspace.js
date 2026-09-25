@@ -30,6 +30,7 @@
   ['nextCollectionBtn', 'nextMonthBtn', 'meetingNextMonthBtn', 'nextDayBtn', 'nextWeekBtn', 'calendarNextBtn'].forEach(function (id) { replaceWithIcon(id, 'chevron-right'); });
   ['manualClientCloseBtn', 'exhibitionDetailCloseBtn', 'exhibitionCloseBtn'].forEach(function (id) { replaceWithIcon(id, 'x'); });
   replaceWithIcon('ownerSearchBtn', 'search');
+  replaceWithIcon('desktopOwnerSearchBtn', 'search');
   replaceWithIcon('cancelEditBtn', 'rotate-ccw');
 
   function decorateCommand(id, name) {
@@ -126,7 +127,18 @@
     var date = parseDateText(value);
     return date.getFullYear() + '년 ' + (date.getMonth() + 1) + '월 ' + date.getDate() + '일 ' + ['일', '월', '화', '수', '목', '금', '토'][date.getDay()] + '요일';
   }
+  function positionWritingControls(desktop) {
+    var host = byId('workspaceContext');
+    var profile = byId('workspaceProfile');
+    if (profile.parentElement === host) return;
+    // Reparent the original controls to keep their values, listeners and form association.
+    var before = byId('workspaceViewDate');
+    host.insertBefore(profile, before);
+    host.insertBefore(byId('workspaceReportDate'), before);
+  }
   function refresh() {
+    var desktop = isDesktopLayout();
+    positionWritingControls(desktop);
     var view = activeViewName();
     var titles = { form: '보고 작성', today: '일일현황', dashboard: '월간현황', meeting: '회의자료', codes: '코드 확인' };
     byId('workspaceTitle').textContent = titles[view] || '일일현황';
@@ -135,9 +147,13 @@
     if (view === 'today' && selectedTeamPeriod === 'week') rangeText = weekLabelFromStart(selectedWeekStart);
     if (view === 'form' || view === 'codes') rangeText = dateLabel(todayText);
     byId('workspaceDate').textContent = rangeText;
+    var writingVisible = view === 'form' || desktop;
+    byId('workspaceProfile').hidden = !writingVisible;
+    byId('workspaceReportDate').hidden = !writingVisible;
+    byId('workspaceViewDate').hidden = writingVisible;
+    byId('workspaceReportDateText').textContent = dayLabel(leaveDateValue(dateInput) || todayText);
     var owner = ownerInput.value || '';
-    byId('workspaceOwner').textContent = owner || '담당자 미선택';
-    byId('workspaceProfile').querySelector('.profile-avatar').textContent = owner ? owner.slice(0, 1) : 'MR';
+    byId('workspaceOwner').textContent = owner || '담당자 선택';
     byId('workspaceDraftMode').textContent = editingId ? '수정 중' : '새 보고';
     document.querySelectorAll('[data-view]').forEach(function (button) {
       if (button.classList.contains('active')) button.setAttribute('aria-current', 'page');
@@ -179,6 +195,11 @@
     new MutationObserver(scheduleRefresh).observe(byId(id), { childList: true });
   });
   new MutationObserver(scheduleRefresh).observe(document.body, { attributes: true, attributeFilter: ['class'] });
+  new MutationObserver(scheduleRefresh).observe(dateInput, { attributes: true, attributeFilter: ['data-date'] });
+  byId('workspaceReportDate').addEventListener('click', function () {
+    if (!reportSaving) openCalendar('formDate', leaveDateValue(dateInput) || todayText);
+  });
+  window.matchMedia('(min-width: 901px)').addEventListener('change', scheduleRefresh);
   ownerInput.addEventListener('change', scheduleRefresh);
   refresh();
 })();

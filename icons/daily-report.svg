@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192">
+  <rect width="192" height="192" rx="42" fill="#f2f4f5"/>
+  <rect x="24" y="24" width="144" height="144" rx="28" fill="#fff"/>
+  <text x="96" y="91" text-anchor="middle" fill="#18282f" font-family="Arial, sans-serif" font-size="54" font-weight="800">MR</text>
+  <rect x="53" y="105" width="86" height="5" rx="2.5" fill="#f06418"/>
+  <text x="96" y="136" text-anchor="middle" fill="#f06418" font-family="Arial, 'Malgun Gothic', sans-serif" font-size="20" font-weight="700">일일보고</text>
+</svg>
