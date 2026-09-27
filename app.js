@@ -30,6 +30,7 @@ var selectedMeetingOwner = "";
 var ownerFilters = {};
 var committedOwnerSearchTerm = "";
 var editingId = "";
+var editingTarget = null;
 var reportSaving = false;
 var ownerNames = ["성진욱", "김무영", "김태홍", "이승엽", "제성규", "송진영", "이현욱"];
 var ownerBranchScopes = {};
@@ -4520,6 +4521,7 @@ function render() {
   }
 }
 function resetAfterSave() {
+  editingTarget = null;
   editingId = "";
   clientInput.value = "";
   clearClientCode();
@@ -4535,6 +4537,7 @@ function resetAfterSave() {
 }
 function resetFormAll() {
   if (reportSaving) return;
+  editingTarget = null;
   editingId = "";
   clientInput.value = "";
   clearClientCode();
@@ -4583,6 +4586,7 @@ function syncViewForLayout() {
 }
 function startEdit(item) {
   if (reportSaving) return;
+  editingTarget = { client: item.client, owner: item.owner, date: item.date };
   editingId = item.id;
   ownerInput.value = item.owner;
   setLeaveDateInput(dateInput, item.date);

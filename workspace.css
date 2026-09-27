@@ -81,6 +81,10 @@ body.workspace { background: var(--bg); font-family: "Segoe UI", "Malgun Gothic"
 .workspace .input-column { grid-column: 1; min-width: 0; position: sticky; top: 88px; }
 .workspace .input-context { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
 .workspace .input-panel { background: #fff; border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 3px 12px #24394704; min-width: 0; }
+.workspace .input-panel.is-editing { background: #fff7f0; border-color: #e99860; }
+.workspace .input-panel.is-editing .input-head { border-bottom-color: #f1d8c6; }
+.workspace .input-panel.is-editing .input-head h2 { color: #a8440b; }
+.workspace .edit-target { padding: 12px 18px 0; color: #713c1d; font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
 .workspace .input-panel .input-head { padding: 18px 18px 16px; border-bottom: 1px solid #edf0f1; display: flex; align-items: center; gap: 9px; }
 .workspace .input-head h2 { font-size: 16px; }
 .input-heading-icon { color: var(--green); display: flex; }
@@ -126,6 +130,7 @@ body.workspace { background: var(--bg); font-family: "Segoe UI", "Malgun Gothic"
 .form-actions { display: grid; grid-template-columns: minmax(0,1fr) 40px; gap: 8px; padding-top: 5px; }
 .workspace .form-actions .btn { min-height: 42px; font-size: 15px; }
 .workspace .form-actions .icon-only { width: 40px; }
+.workspace .input-panel.is-editing .form-actions { grid-template-columns: minmax(0, 1fr) auto; }
 .workspace .toast:empty { display: none; }
 .workspace .head { padding: 0; }
 .workspace .body { padding: 0; gap: 20px; }
@@ -219,6 +224,8 @@ body.workspace { background: var(--bg); font-family: "Segoe UI", "Malgun Gothic"
 .workspace .report-card { border: 1px solid #e1e8e8; border-radius: 6px; box-shadow: none; padding: 14px 14px 13px 40px; gap: 8px; }
 .workspace .report-card::before { display: none; }
 .workspace .report-card.open { border-color: var(--accent-line); background: #fff; }
+.workspace .report-card.is-editing { background: #fff7f0; border-color: #e99860; }
+.workspace .report-edit-status { color: #a8440b; font-size: 13px; font-weight: 700; white-space: nowrap; }
 .workspace .report-number { border-radius: 4px; background: #f0f5f4; color: #7b9492; left: 12px; top: 16px; width: 18px; height: 18px; font-size: 12px; }
 .workspace .client { font-size: 15px; font-weight: 700; line-height: 1.5; color: #20272b; }
 .workspace .client-code { color: #2455a4; font-size: 12px; font-weight: 650; background: none; padding: 0; font-variant-numeric: tabular-nums; }

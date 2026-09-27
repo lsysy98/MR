@@ -154,7 +154,27 @@
     byId('workspaceReportDateText').textContent = dayLabel(leaveDateValue(dateInput) || todayText);
     var owner = ownerInput.value || '';
     byId('workspaceOwner').textContent = owner || '담당자 선택';
-    byId('workspaceDraftMode').textContent = editingId ? '수정 중' : '새 보고';
+    var editing = Boolean(editingId);
+    var panel = document.querySelector('.input-panel');
+    panel.classList.toggle('is-editing', editing);
+    panel.querySelector('.input-head h2').textContent = editing ? '보고 수정 중' : '보고 작성';
+    byId('workspaceDraftMode').hidden = editing;
+    var target = byId('workspaceEditTarget');
+    var targetText = editing && editingTarget ? [editingTarget.client, editingTarget.owner, editingTarget.date].join(' · ') : '';
+    target.hidden = !editing;
+    if (target.textContent !== targetText) target.textContent = targetText;
+    var cancel = byId('cancelEditBtn');
+    if (cancel.dataset.editing !== String(editing)) {
+      cancel.dataset.editing = String(editing);
+      cancel.classList.toggle('icon-only', !editing);
+      cancel.classList.toggle('icon-command', editing);
+      cancel.title = editing ? '수정 취소' : '입력 초기화';
+      cancel.setAttribute('aria-label', cancel.title);
+      cancel.replaceChildren(icon(editing ? 'x' : 'rotate-ccw'));
+      if (editing) cancel.append('수정 취소');
+    }
+    var submitIcon = byId('submitBtn').querySelector('use');
+    if (submitIcon) submitIcon.setAttribute('href', 'assets/workspace-icons.svg#' + (editing ? 'pen-line' : 'plus'));
     document.querySelectorAll('[data-view]').forEach(function (button) {
       if (button.classList.contains('active')) button.setAttribute('aria-current', 'page');
       else button.removeAttribute('aria-current');
@@ -175,6 +195,15 @@
     decorateOwners(byId('ownerCards'), true);
     decorateMeeting();
     document.querySelectorAll('.report-card').forEach(function (card) {
+      var selected = editing && card.dataset.reportId === String(editingId);
+      card.classList.toggle('is-editing', selected);
+      var editStatus = card.querySelector('.report-edit-status');
+      if (selected && !editStatus) {
+        editStatus = document.createElement('span');
+        editStatus.className = 'report-edit-status';
+        editStatus.textContent = '수정 중';
+        card.querySelector('.client-wrap').appendChild(editStatus);
+      } else if (!selected && editStatus) editStatus.remove();
       if (card.dataset.keyboardReady) return;
       card.dataset.keyboardReady = 'true';
       card.tabIndex = 0;
