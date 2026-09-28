@@ -504,3 +504,36 @@ body.workspace { background: var(--bg); font-family: "Segoe UI", "Malgun Gothic"
   .network-activity::before, .client-suggestion.is-loading::before { animation: none; }
   .workspace *, .workspace *::before, .workspace *::after { scroll-behavior: auto !important; transition: none !important; }
 }
+.workspace .analytics-panel { display: none; min-width: 0; grid-column: 2; }
+.workspace.view-analytics .analytics-panel { display: block; }
+.workspace.view-analytics main > :is(.dashboard, .today-panel, .meeting-panel, .code-panel) { display: none; }
+.analytics-toolbar, .analytics-controls { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.analytics-toolbar { margin-bottom: 18px; }
+.analytics-controls .seg { display: flex; }
+.analytics-controls .seg button { padding: 0 12px; }
+.analytics-basis { color: #647078; font-size: 12px; }
+.analytics-controls { margin-bottom: 16px; }
+.workspace .desktop-tabs.analytics-nav { margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--line); }
+.analytics-owner-filter { display: flex; align-items: center; gap: 12px; margin: 0 0 16px; color: var(--text); font-size: 14px; }
+.analytics-owner-filter select { width: 160px; max-width: 100%; min-height: 38px; margin: 0; background: #fff; }
+.workspace .analytics-person { display: flex; justify-content: space-between; align-items: center; gap: 12px; width: 100%; min-height: 32px; padding: 0; border: 0; background: transparent; color: var(--text); font-size: inherit; font-weight: 700; cursor: pointer; text-align: left; }
+.workspace .analytics-person:hover { color: var(--accent); }
+.analytics-person .ui-icon { width: 15px; height: 15px; color: #78858c; }
+.analytics-table .analytics-owner-row:hover { background: #fafbfc; }
+.analytics-table .analytics-owner-row { cursor: pointer; }
+.analytics-table .analytics-headquarters-row { background: #edf1f3; color: #26343c; font-weight: 700; }
+.analytics-table .analytics-headquarters-row th { min-width: 155px; }
+.analytics-table .analytics-branch-row th { padding-left: 26px; font-weight: 500; }
+.analytics-table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
+.analytics-table { width: 100%; min-width: 700px; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+.analytics-table th, .analytics-table td { padding: 13px 12px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
+.analytics-table th:first-child { text-align: left; min-width: 110px; max-width: 190px; white-space: normal; overflow-wrap: anywhere; }
+.analytics-table thead, .analytics-table tfoot { background: #f0f3f4; }
+.analytics-table tfoot { font-weight: 700; }
+.analytics-table tfoot th, .analytics-table tfoot td { border-bottom: 0; }
+.analytics-empty { color: var(--muted); text-align: center; padding: 18px; }
+@media (max-width: 900px) {
+  .workspace.view-analytics .input-column { display: none; }
+  .workspace .mobile-tabs { grid-template-columns: repeat(5, minmax(0, 1fr)); padding-left: 6px; padding-right: 6px; gap: 2px; }
+  .workspace .mobile-tabs .mobile-tab { white-space: nowrap; }
+}

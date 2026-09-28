@@ -2478,7 +2478,7 @@
     }
 
   </style>
-  <link rel="stylesheet" href="workspace.css?v=20260928-edit-state">
+  <link rel="stylesheet" href="workspace.css?v=20260929-analytics">
 </head>
 <body class="view-form workspace">
   <header class="workspace-topbar">
@@ -2505,6 +2505,7 @@
       <button class="mobile-tab" type="button" data-view="today"><i data-icon="calendar-days" aria-hidden="true"></i><span>일일현황</span></button>
       <button class="mobile-tab" type="button" data-view="dashboard"><i data-icon="chart-no-axes-combined" aria-hidden="true"></i><span>월간현황</span></button>
       <button class="mobile-tab" type="button" data-view="meeting"><i data-icon="presentation" aria-hidden="true"></i><span>회의자료</span></button>
+      <button class="mobile-tab" type="button" data-view="analytics"><i data-icon="chart-no-axes-combined" aria-hidden="true"></i><span>실적 분석</span></button>
     </div>
   </header>
   <aside class="workspace-sidebar" aria-label="주 메뉴">
@@ -2513,6 +2514,9 @@
       <button class="mobile-tab active" type="button" data-view="today" title="일일현황"><i data-icon="calendar-days" aria-hidden="true"></i><span>일일현황</span></button>
       <button class="mobile-tab" type="button" data-view="dashboard" title="월간현황"><i data-icon="chart-no-axes-combined" aria-hidden="true"></i><span>월간현황</span></button>
       <button class="mobile-tab" type="button" data-view="meeting" title="회의자료"><i data-icon="presentation" aria-hidden="true"></i><span>회의자료</span></button>
+    </nav>
+    <nav class="desktop-tabs analytics-nav" aria-label="실적 분석">
+      <button class="mobile-tab" type="button" data-view="analytics" title="실적 분석"><i data-icon="chart-no-axes-combined" aria-hidden="true"></i><span>실적 분석</span></button>
     </nav>
     <div class="sidebar-team"><i data-icon="briefcase-business" aria-hidden="true"></i><div><strong>MR 수도권팀</strong><span>일일보고 워크스페이스</span></div></div>
   </aside>
@@ -2728,6 +2732,39 @@
           <div class="empty" id="codeReviewEmpty">거래처코드가 비어 있는 보고가 없습니다.</div>
         </div>
       </section>
+    </section>
+    <section class="analytics-panel" id="analyticsPanel" aria-labelledby="analyticsTitle">
+      <div class="analytics-toolbar">
+        <h2 id="analyticsTitle">실적 분석</h2>
+        <div class="period-navigation month-control">
+          <button class="btn icon-only" type="button" id="analyticsPrevMonth" aria-label="이전 월" title="이전 월"><i data-icon="chevron-left" aria-hidden="true"></i></button>
+          <div class="month-picker-shell">
+            <input class="month-picker-input" id="analyticsMonth" type="month" aria-label="분석 기준 월">
+            <button class="month-picker-label" id="analyticsMonthLabel" type="button" title="월 선택" aria-label="분석 기준 월 선택"></button>
+          </div>
+          <button class="btn icon-only" type="button" id="analyticsNextMonth" aria-label="다음 월" title="다음 월"><i data-icon="chevron-right" aria-hidden="true"></i></button>
+        </div>
+      </div>
+      <div class="analytics-controls">
+        <div class="seg" role="group" aria-label="실적 집계 기준">
+          <button type="button" data-analytics-group="owner" class="active" aria-pressed="true">개인별</button>
+          <button type="button" data-analytics-group="branch" aria-pressed="false">지점별</button>
+        </div>
+        <span class="analytics-basis">통계 수거 월 기준</span>
+      </div>
+      <label class="analytics-owner-filter" id="analyticsOwnerFilter" hidden>
+        <span>담당자</span>
+        <select id="analyticsOwner" aria-label="분석 담당자"><option value="">전체 담당자</option></select>
+      </label>
+      <div class="analytics-table-wrap" tabindex="0" role="region" aria-label="월별 실적 집계표">
+        <table class="analytics-table">
+          <caption class="sr-only" id="analyticsCaption">월별 실적</caption>
+          <thead><tr><th scope="col" id="analyticsGroupTitle">담당자</th><th scope="col">신규 건수</th><th scope="col">신규 금액</th><th scope="col">매출증대 건수</th><th scope="col">매출증대 금액</th><th scope="col">전체 건수</th><th scope="col">전체 금액</th></tr></thead>
+          <tbody id="analyticsRows"></tbody>
+          <tfoot id="analyticsTotal"></tfoot>
+        </table>
+      </div>
+      <p class="analytics-empty" id="analyticsEmpty" hidden>선택한 월의 보고가 없습니다.</p>
     </section>
   </main>
   <footer class="app-credit">
@@ -2968,9 +3005,11 @@
       <footer><button class="btn primary" type="button" id="notificationEnable" disabled>알림 받기</button><div class="tools-actions"><button class="btn" type="button" id="notificationTest" disabled>시험 알림</button><button class="btn" type="button" id="notificationDisable" disabled>이 기기 알림 해제</button></div></footer>
     </section>
   </div>
-  <script src="app.js?v=20260928-edit-state"></script>
+  <script src="app.js?v=20260929-analytics"></script>
   <script src="site-tools.js?v=20260918-notifications-2"></script>
-  <script src="workspace.js?v=20260928-edit-state"></script>
+  <script src="branch-headquarters.js?v=20260929-all-owner-branches"></script>
+  <script src="analytics.js?v=20260929-owner-total-order"></script>
+  <script src="workspace.js?v=20260929-analytics"></script>
 </body>
 </html>
 

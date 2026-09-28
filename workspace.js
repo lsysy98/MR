@@ -140,10 +140,10 @@
     var desktop = isDesktopLayout();
     positionWritingControls(desktop);
     var view = activeViewName();
-    var titles = { form: '보고 작성', today: '일일현황', dashboard: '월간현황', meeting: '회의자료', codes: '코드 확인' };
+    var titles = { form: '보고 작성', today: '일일현황', dashboard: '월간현황', meeting: '회의자료', codes: '코드 확인', analytics: '실적 분석' };
     byId('workspaceTitle').textContent = titles[view] || '일일현황';
     byId('workspaceSection').textContent = view === 'form' ? '보고 작성' : view === 'meeting' ? '회의자료' : view === 'codes' ? '거래처' : '보고 현황';
-    var rangeText = view === 'dashboard' || view === 'meeting' ? selectedYear + '년 ' + selectedMonth + '월' : dateLabel(selectedTeamDate);
+    var rangeText = view === 'dashboard' || view === 'meeting' || view === 'analytics' ? selectedYear + '년 ' + selectedMonth + '월' : dateLabel(selectedTeamDate);
     if (view === 'today' && selectedTeamPeriod === 'week') rangeText = weekLabelFromStart(selectedWeekStart);
     if (view === 'form' || view === 'codes') rangeText = dateLabel(todayText);
     byId('workspaceDate').textContent = rangeText;
