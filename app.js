@@ -4455,6 +4455,7 @@ function openScreenshotPreview(imageUrl, filename) {
   var message = document.getElementById("screenshotMessage");
   var shareButton = document.getElementById("screenshotShareBtn");
   var expandButton = document.getElementById("screenshotExpandBtn");
+  var closeButton = document.getElementById("screenshotCloseBtn");
   var file = null;
   try {
     if (typeof navigator.share === "function" && typeof navigator.canShare === "function") {
@@ -4474,29 +4475,12 @@ function openScreenshotPreview(imageUrl, filename) {
   shareButton.disabled = false;
   function setExpanded(expanded) {
     dialog.classList.toggle("is-expanded", expanded);
-    if (expanded) {
-      image.tabIndex = 0;
-      image.setAttribute("role", "button");
-      image.setAttribute("aria-label", "캡처 미리보기로 돌아가기");
-      image.focus();
-    } else {
-      image.removeAttribute("tabindex");
-      image.removeAttribute("role");
-      image.removeAttribute("aria-label");
-      if (dialog.open) expandButton.focus();
-    }
+    closeButton.setAttribute("aria-label", expanded ? "크게 보기 닫기" : "캡처 닫기");
+    closeButton.title = expanded ? "크게 보기 닫기" : "닫기";
+    if (dialog.open) (expanded ? closeButton : expandButton).focus();
   }
   setExpanded(false);
   expandButton.onclick = function() { setExpanded(true); };
-  image.onclick = function() {
-    if (dialog.classList.contains("is-expanded")) setExpanded(false);
-  };
-  image.onkeydown = function(event) {
-    if (dialog.classList.contains("is-expanded") && (event.key === "Enter" || event.key === " ")) {
-      event.preventDefault();
-      setExpanded(false);
-    }
-  };
   dialog.oncancel = function(event) {
     if (dialog.classList.contains("is-expanded")) {
       event.preventDefault();
@@ -4509,7 +4493,10 @@ function openScreenshotPreview(imageUrl, filename) {
     shareButton.onclick = null;
     document.getElementById("screenshotDownloadBtn").onclick = null;
   };
-  document.getElementById("screenshotCloseBtn").onclick = function() { dialog.close(); };
+  closeButton.onclick = function() {
+    if (dialog.classList.contains("is-expanded")) setExpanded(false);
+    else dialog.close();
+  };
   document.getElementById("screenshotDownloadBtn").onclick = function() {
     try {
       downloadScreenshotImage(imageUrl, filename);
@@ -4532,26 +4519,6 @@ function openScreenshotPreview(imageUrl, filename) {
   shareButton.onclick = shareImage;
   dialog.showModal();
 }
-function drawRoundedBox(ctx, x, y, w, h, color, stroke) {
-  ctx.fillStyle = color;
-  if (typeof ctx.roundRect === "function") {
-    ctx.beginPath();
-    ctx.roundRect(x, y, w, h, 14);
-    ctx.fill();
-    if (stroke) {
-      ctx.strokeStyle = stroke;
-      ctx.lineWidth = 2;
-      ctx.stroke();
-    }
-    return;
-  }
-  ctx.fillRect(x, y, w, h);
-  if (stroke) {
-    ctx.strokeStyle = stroke;
-    ctx.lineWidth = 2;
-    ctx.strokeRect(x, y, w, h);
-  }
-}
 function makeTeamScreenshot(period) {
   var isWeek = period === "week";
   var range = monthBoundedWeekRange();
@@ -4568,66 +4535,86 @@ function makeTeamScreenshot(period) {
   var groups = teamGroupsForScreenshot(items);
   var stats = completionStats();
   var width = 430;
-  var rowHeight = 52;
-  var height = 220 + groups.length * rowHeight;
+  var rowHeight = 56;
+  var tableY = 254;
+  var height = tableY + groups.length * rowHeight + 22;
   var canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = height;
+  canvas.width = width * 2;
+  canvas.height = height * 2;
   var ctx = canvas.getContext("2d");
-
-  ctx.fillStyle = "#f4f7f5";
-  ctx.fillRect(0, 0, width, height);
-  ctx.fillStyle = "#17211c";
-  ctx.font = "900 25px Malgun Gothic, sans-serif";
-  ctx.fillText(isWeek ? "주간현황" : "일일현황", 22, 42);
-  ctx.font = "700 14px Malgun Gothic, sans-serif";
-  ctx.fillStyle = "#66736d";
-  ctx.fillText(isWeek ? weekLabelFromStart(selectedWeekStart) + " (" + range.start + " ~ " + range.end + ")" : dayLabel(selectedTeamDate), 22, 66);
-
-  var boxY = 86;
-  var boxW = 124;
-  [
-    ["전체", wonMan(summary.total.amount), summary.total.count + "건"],
-    ["신규", wonMan(summary.new.amount), summary.new.count + "건"],
-    ["매출증대", wonMan(summary.growth.amount), summary.growth.count + "건"]
-  ].forEach(function(box, index) {
-    var x = 22 + index * (boxW + 8);
-    drawRoundedBox(ctx, x, boxY, boxW, 82, "#ffffff", "#d9e2dc");
-    ctx.fillStyle = "#66736d";
-    ctx.font = "700 13px Malgun Gothic, sans-serif";
-    ctx.fillText(box[0], x + 12, boxY + 24);
-    ctx.fillStyle = "#17211c";
-    ctx.font = "900 17px Malgun Gothic, sans-serif";
-    ctx.fillText(box[1], x + 12, boxY + 52);
-    ctx.fillStyle = "#66736d";
-    ctx.font = "700 12px Malgun Gothic, sans-serif";
-    ctx.fillText(box[2], x + 12, boxY + 72);
-  });
-
-  var y = 202;
-  groups.forEach(function(group) {
-    var status = !isWeek ? (stats.statusMap[group.owner] || "missing") : "";
-    var bg = status === "done" ? "#edf9f4" : (status === "leave" ? "#f7f8f7" : "#ffffff");
-    drawRoundedBox(ctx, 22, y - 24, width - 44, 42, bg, "#d9e2dc");
-    ctx.fillStyle = "#17211c";
-    ctx.font = "900 17px Malgun Gothic, sans-serif";
-    ctx.fillText(group.owner, 36, y + 3);
-    if (!isWeek && status === "leave") {
-      ctx.fillStyle = "#7b8580";
-      ctx.font = "900 12px Malgun Gothic, sans-serif";
-      ctx.fillText("연차", 92, y + 2);
+  if (!ctx) throw new Error("캡처 이미지 생성 불가");
+  ctx.scale(2, 2);
+  var colors = { text: "#20272b", muted: "#647078", line: "#e2e7e9", orange: "#cf4b09", blue: "#3869b6", done: "#087e74" };
+  function text(value, x, y, size, color, weight, maxWidth, align) {
+    var font = 'px "Segoe UI", "Malgun Gothic", system-ui, sans-serif';
+    ctx.font = (weight || 600) + " " + size + font;
+    while (maxWidth && ctx.measureText(value).width > maxWidth && size > 11) {
+      size -= 1;
+      ctx.font = (weight || 600) + " " + size + font;
     }
-    ctx.fillStyle = "#66736d";
-    ctx.font = "800 13px Malgun Gothic, sans-serif";
-    ctx.textAlign = "right";
-    ctx.fillText("신규" + group.summary.new.count, 246, y + 2);
-    ctx.fillText("증대" + group.summary.growth.count, 294, y + 2);
-    ctx.fillStyle = "#17211c";
-    ctx.font = "900 15px Malgun Gothic, sans-serif";
-    ctx.fillText(won(group.summary.total.amount), width - 36, y + 3);
-    ctx.textAlign = "left";
-    y += rowHeight;
+    ctx.fillStyle = color || colors.text;
+    ctx.textAlign = align || "left";
+    if (maxWidth) ctx.fillText(value, x, y, maxWidth);
+    else ctx.fillText(value, x, y);
+  }
+  function rule(y) {
+    ctx.fillStyle = colors.line;
+    ctx.fillRect(22, y, width - 44, 1);
+  }
+
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, width, height);
+  text("MR", 22, 30, 16, colors.orange, 800);
+  text("일일보고", 55, 30, 14, colors.text, 700);
+  text("수도권팀", width - 22, 30, 12, colors.muted, 600, 100, "right");
+  text(isWeek ? "주간현황" : "일일현황", 22, 67, 26, colors.text, 750);
+  var periodLabel = isWeek
+    ? weekLabelFromStart(selectedWeekStart) + " · " + range.start.replace(/-/g, ".") + " ~ " + range.end.slice(5).replace(/-/g, ".")
+    : dayLabel(selectedTeamDate);
+  text(periodLabel, 22, 92, 13, colors.muted, 500, width - 44);
+  rule(110);
+
+  var columnWidth = (width - 44) / 3;
+  [
+    ["전체", summary.total, colors.text],
+    ["신규", summary.new, colors.orange],
+    ["매출증대", summary.growth, colors.blue]
+  ].forEach(function(box, index) {
+    var x = 22 + index * columnWidth + (index ? 14 : 0);
+    if (index) {
+      ctx.fillStyle = colors.line;
+      ctx.fillRect(22 + index * columnWidth, 130, 1, 64);
+    }
+    text(box[0], x, 140, 12, colors.muted, 500);
+    text(wonMan(box[1].amount), x, 172, 22, box[2], 750, columnWidth - 24);
+    text(box[1].count + "건", x, 195, 13, colors.muted, 500);
   });
+  rule(214);
+  text("담당자별 보고", 22, 241, 14, colors.text, 700);
+  var completionLabel = "보고 완료 " + stats.done.length + " / " + ownerNames.length;
+  if (stats.leave.length) completionLabel += " · 연차 " + stats.leave.length;
+  text(isWeek ? "총 " + summary.total.count + "건" : completionLabel,
+    width - 22, 241, 12, isWeek ? colors.muted : colors.done, 600, 220, "right");
+
+  groups.forEach(function(group, index) {
+    var y = tableY + index * rowHeight;
+    var status = !isWeek ? (stats.statusMap[group.owner] || "missing") : "";
+    if (status === "done" || status === "leave") {
+      ctx.fillStyle = status === "done" ? "#f0f8f5" : "#f7f8f9";
+      ctx.fillRect(22, y, width - 44, rowHeight);
+    }
+    rule(y);
+    text(String(index + 1), 38, y + 33, 13, colors.muted, 600, 22, "center");
+    text(group.owner, 63, y + (isWeek ? 33 : 24), 16, colors.text, 650, 112);
+    if (!isWeek) {
+      text(dailyStatusLabel(status), 63, y + 43, 11,
+        status === "done" ? colors.done : status === "leave" ? colors.muted : "#be4252", 600);
+    }
+    text(won(group.summary.total.amount), width - 34, y + 24, 17, colors.text, 700, 208, "right");
+    text("신규 " + group.summary.new.count + " · 증대 " + group.summary.growth.count,
+      width - 34, y + 43, 11, colors.muted, 500, 208, "right");
+  });
+  rule(tableY + groups.length * rowHeight);
 
   return canvas;
 }
