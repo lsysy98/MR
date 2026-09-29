@@ -1,4 +1,5 @@
 const crypto = require("crypto");
+const { analyzeCims } = require('../lib/cims-policy');
 
 const DEFAULT_CIMS_SHEET_ID = "1ciVrJFqZyrXQvgBxZtSLwn9MxvOculLugDERIpHeEkY";
 const DEFAULT_CIMS_SHEET_GID = "0";
@@ -138,7 +139,7 @@ function findCimsHeaderIndex(rows) {
 }
 
 function rowsFromCimsCsv(text) {
-  return require('../lib/cims-policy').analyzeCims(parseCsv(text)).allowed;
+  return analyzeCims(parseCsv(text)).allowed;
 }
 
 function rowsFromStatsCsv(text) {
@@ -312,247 +313,6 @@ function existingClientRows(statsRows, now) {
   return rows;
 }
 
-function reportClientLooksLikeDirectoryItem(reportClient, directoryItem) {
-  const reportKey = normalizeClinicName(reportClient);
-  const clientKey = normalizeClinicName(directoryItem && directoryItem.client_name);
-  const branchKey = normalizeBranch(directoryItem && directoryItem.branch_name);
-  const branchTextKey = normalize(directoryItem && directoryItem.branch_name);
-  if (!reportKey || !clientKey) return false;
-  if (reportKey === clientKey) return true;
-  if (reportKey.length >= 5 && clientKey.includes(reportKey)) return true;
-  if (clientKey.length >= 5 && reportKey.includes(clientKey)) return true;
-  if (!branchKey) return false;
-  return reportKey === branchTextKey + clientKey ||
-    reportKey === clientKey + branchTextKey ||
-    (reportKey.includes(clientKey) && reportKey.includes(branchKey));
-}
-
-function branchLooksSame(a, b) {
-  const left = normalizeBranch(a);
-  const right = normalizeBranch(b);
-  return Boolean(left && right && left === right);
-}
-
-function buildOwnerBranchMap(branchRows) {
-  return branchRows.reduce((map, row) => {
-    const ownerKey = normalize(row.owner);
-    if (!ownerKey) return map;
-    if (!map.has(ownerKey)) map.set(ownerKey, new Set());
-    map.get(ownerKey).add(row.branch_key);
-    return map;
-  }, new Map());
-}
-
-function uniqueByCode(matches) {
-  const byCode = new Map();
-  matches.forEach((item) => {
-    const code = normalize(item.client_code);
-    if (code) byCode.set(code, item);
-  });
-  if (byCode.size === 1) return Array.from(byCode.values())[0];
-  if (!byCode.size && matches.length === 1) return matches[0];
-  return null;
-}
-
-function scoreReportMatch(report, item) {
-  const reportKey = normalizeClinicName(report.client);
-  const clientKey = normalizeClinicName(item && item.client_name);
-  const reportBranch = normalizeBranch(report.branch_name);
-  const itemBranch = normalizeBranch(item && item.branch_name);
-  if (!reportKey || !clientKey) return 99;
-  if (reportBranch && itemBranch && !branchLooksSame(itemBranch, reportBranch)) return 99;
-  if (reportKey === clientKey && reportBranch && itemBranch && branchLooksSame(itemBranch, reportBranch)) return 0;
-  if (reportKey === clientKey) return 1;
-  if (reportClientLooksLikeDirectoryItem(report.client, item) && reportBranch && itemBranch && branchLooksSame(itemBranch, reportBranch)) return 2;
-  if (reportClientLooksLikeDirectoryItem(report.client, item)) return 3;
-  return 99;
-}
-
-function bestUniqueMatch(report, matches) {
-  if (!matches.length) return null;
-  const scored = matches
-    .map((item) => ({ item, score: scoreReportMatch(report, item) }))
-    .filter((row) => row.score < 99)
-    .sort((a, b) => a.score - b.score);
-  if (!scored.length) return null;
-  const bestScore = scored[0].score;
-  return uniqueByCode(scored.filter((row) => row.score === bestScore).map((row) => row.item));
-}
-
-function rowsForReportOwner(report, rows, ownerBranchMap) {
-  const ownerKey = normalize(report.owner);
-  const exactOwnerRows = ownerKey
-    ? rows.filter((item) => normalize(item.owner) === ownerKey)
-    : [];
-  if (exactOwnerRows.length) return exactOwnerRows;
-
-  const ownerBranches = ownerBranchMap.get(ownerKey) || new Set();
-  return ownerBranches.size
-    ? rows.filter((item) => ownerBranches.has(item.branch_key))
-    : rows;
-}
-
-function reportMatchesFromRows(report, rows, options = {}) {
-  let matches = rows.filter((item) => reportClientLooksLikeDirectoryItem(report.client, item));
-  if (!matches.length) return [];
-
-  if (report.branch_name && !options.ignoreBranch) {
-    const branchMatches = matches.filter((item) => branchLooksSame(item.branch_name, report.branch_name));
-    return branchMatches;
-  }
-
-  return matches;
-}
-
-function bestReportMatch(report, rows, ignoreBranch) {
-  const probe = ignoreBranch ? { ...report, branch_name: "" } : report;
-  return bestUniqueMatch(probe, reportMatchesFromRows(report, rows, { ignoreBranch }));
-}
-
-function rowsForReportBranch(report, rows) {
-  const reportBranch = cleanCell(report && report.branch_name);
-  if (!reportBranch) return [];
-  return rows.filter((item) => branchLooksSame(item.branch_name, reportBranch));
-}
-
-function uniqueExistingReportMatch(report, existingRows) {
-  if (!report) return null;
-  const branchRows = rowsForReportBranch(report, existingRows);
-  if (branchRows.length || cleanCell(report.branch_name)) {
-    return bestReportMatch(report, branchRows, false);
-  }
-
-  return bestReportMatch(report, existingRows, false);
-}
-
-function uniqueReportMatch(report, directoryRows) {
-  if (!report) return null;
-  const branchRows = rowsForReportBranch(report, directoryRows);
-  if (branchRows.length || cleanCell(report.branch_name)) {
-    return bestReportMatch(report, branchRows, false);
-  }
-
-  return bestReportMatch(report, directoryRows, false);
-}
-
-function currentCodeRow(report, directoryRows, existingRows) {
-  const currentCode = normalize(report && report.client_code);
-  if (!currentCode) return null;
-  return directoryRows.find((item) => normalize(item.client_code) === currentCode) ||
-    existingRows.find((item) => normalize(item.client_code) === currentCode) ||
-    null;
-}
-
-async function supabasePaged(pathBase, pageSize = 1000, maxPages = 30) {
-  const rows = [];
-  for (let page = 0; page < maxPages; page += 1) {
-    const separator = pathBase.includes("?") ? "&" : "?";
-    const pageRows = await supabase(`${pathBase}${separator}limit=${pageSize}&offset=${page * pageSize}`);
-    if (!Array.isArray(pageRows) || !pageRows.length) break;
-    rows.push(...pageRows);
-    if (pageRows.length < pageSize) break;
-  }
-  return rows;
-}
-
-async function backfillReportClientCodes(directoryRows, branchRows, existingRows) {
-  const reportRows = await supabasePaged("reports?select=id,report_date,owner,client,branch_name,client_code&order=created_at.asc");
-  let updated = 0;
-  let ambiguous = 0;
-  let skipped = 0;
-  let existingMatched = 0;
-  let directoryMatched = 0;
-  let corrected = 0;
-  let clearedWrongBranch = 0;
-  let renamed = 0;
-  const unresolvedSamples = [];
-  const unresolvedByOwner = {};
-
-  function rememberUnresolved(report, reason) {
-    const owner = cleanCell(report.owner) || "담당자 미지정";
-    if (!unresolvedByOwner[owner]) unresolvedByOwner[owner] = [];
-    const item = {
-      date: report.report_date || "",
-      client: report.client || "",
-      branchName: report.branch_name || "",
-      reason
-    };
-    if (unresolvedByOwner[owner].length < 50) unresolvedByOwner[owner].push(item);
-    if (unresolvedSamples.length < 20) unresolvedSamples.push({ owner, ...item });
-  }
-
-  for (const report of reportRows) {
-    let source = "existing";
-    let match = uniqueExistingReportMatch(report, existingRows);
-    if (!match) {
-      source = "directory";
-      match = uniqueReportMatch(report, directoryRows);
-    }
-    const currentCode = cleanCell(report.client_code);
-    if (!match) {
-      const existingCodeRow = currentCodeRow(report, directoryRows, existingRows);
-      if (currentCode && report.branch_name && existingCodeRow && existingCodeRow.branch_name &&
-          !branchLooksSame(existingCodeRow.branch_name, report.branch_name)) {
-        await supabase(`reports?id=eq.${encodeURIComponent(report.id)}`, {
-          method: "PATCH",
-          headers: { Prefer: "return=minimal" },
-          body: JSON.stringify({
-            client_code: "",
-            branch_name: report.branch_name || ""
-          })
-        });
-        updated += 1;
-        corrected += 1;
-        clearedWrongBranch += 1;
-        rememberUnresolved(report, "지점과 맞지 않는 기존 코드를 제거함");
-        continue;
-      }
-      if (currentCode) {
-        skipped += 1;
-      } else {
-        ambiguous += 1;
-        rememberUnresolved(report, "거래처코드 후보를 하나로 특정하지 못함");
-      }
-      continue;
-    }
-    const nextCode = cleanCell(match.client_code);
-    const nextBranch = cleanCell(match.branch_name || report.branch_name);
-    const nextClient = cleanCell(match.client_name || report.client);
-    const currentBranch = cleanCell(report.branch_name);
-    const currentClient = cleanCell(report.client);
-    const clientAlreadyOk = !nextClient || currentClient === nextClient;
-    if (currentCode && (!nextCode || normalize(currentCode) === normalize(nextCode)) &&
-        (!nextBranch || branchLooksSame(currentBranch, nextBranch) || currentBranch === nextBranch) &&
-        clientAlreadyOk) {
-      skipped += 1;
-      continue;
-    }
-    const patchBody = {
-      client_code: nextCode || currentCode,
-      branch_name: nextBranch || currentBranch || ""
-    };
-    if (nextClient) patchBody.client = nextClient;
-    await supabase(`reports?id=eq.${encodeURIComponent(report.id)}`, {
-      method: "PATCH",
-      headers: { Prefer: "return=minimal" },
-      body: JSON.stringify(patchBody)
-    });
-    updated += 1;
-    if (currentCode && nextCode && normalize(currentCode) !== normalize(nextCode)) corrected += 1;
-    if (nextClient && currentClient !== nextClient) renamed += 1;
-    if (source === "existing") existingMatched += 1;
-    else directoryMatched += 1;
-  }
-
-  return { total: reportRows.length, updated, corrected, clearedWrongBranch, renamed, existingMatched, directoryMatched, ambiguous, skipped, unresolvedSamples, unresolvedByOwner };
-}
-
-async function clearTable(table) {
-  await supabase(`${table}?id=neq.__never__`, {
-    method: "DELETE",
-    headers: { Prefer: "return=minimal" }
-  });
-}
 
 async function upsertRows(table, rows) {
   const size = 150;
@@ -571,6 +331,12 @@ module.exports = async function handler(req, res) {
   try {
     const requestUrl = new URL(req.url, "http://localhost");
     const key = String(req.headers?.authorization || '').replace(/^Bearer /, '') || requestUrl.searchParams.get("key") || "";
+
+    if (req.method === "GET" && requestUrl.searchParams.get("mode") === "review") {
+      const items = await supabase("rpc/preview_report_client_matches", { method: "POST", body: "{}" });
+      res.setHeader("Cache-Control", "no-store");
+      return json(res, 200, { ok: true, items });
+    }
 
     if (req.method !== "GET" && req.method !== "POST") {
       return json(res, 405, { error: "Method not allowed" });
@@ -599,14 +365,10 @@ module.exports = async function handler(req, res) {
     const branchRows = ownerBranchRows(statsRows, now);
     const existingRows = existingClientRows(statsRows, now);
 
-    await clearTable("owner_branch_map");
-    await clearTable("existing_clients");
-
+    if (!directoryRows.length || !branchRows.length || !existingRows.length) throw new Error("시트가 비어 있어 기존 목록을 유지했습니다.");
     await upsertRows("client_directory", directoryRows);
-    await upsertRows("owner_branch_map", branchRows);
-    await upsertRows("existing_clients", existingRows);
-    const currentDirectoryRows = await supabasePaged("client_directory?select=client_code,client_name,branch_name,branch_key,sort_order");
-    const backfill = await backfillReportClientCodes(currentDirectoryRows, branchRows, existingRows);
+    await supabase("rpc/replace_client_labels", { method: "POST", body: JSON.stringify({ p_branches: branchRows, p_existing: existingRows }) });
+    const backfill = { updated: 0, mode: "preview_only", message: "기존 보고는 변경하지 않았습니다. 메뉴 > 코드확인 > 연결 변경 미리보기에서 확인해주세요." };
 
     return json(res, 200, {
       ok: true,

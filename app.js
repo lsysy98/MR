@@ -31,7 +31,6 @@ var ownerFilters = {};
 var committedOwnerSearchTerm = "";
 var editingId = "";
 var editingTarget = null;
-var reportSaving = false;
 var ownerNames = ["성진욱", "김무영", "김태홍", "이승엽", "제성규", "송진영", "이현욱"];
 var ownerBranchScopes = {};
 var productGroups = [
@@ -197,6 +196,10 @@ var noticeActionRequired = false;
 var ownerLeaveRows = [];
 var clientLookupTimer = null;
 var clientLookupSeq = 0;
+function cancelClientLookup() {
+  clientLookupSeq += 1;
+  if (clientLookupTimer) clearTimeout(clientLookupTimer);
+}
 var manualClientLookupTimer = null;
 var manualClientLookupSeq = 0;
 var lastSelectedClientMatch = null;
@@ -426,13 +429,13 @@ function downloadResolvedScreenshot() {
 function showAllResolvedNotice() {
   if (shouldCaptureWeeklyForDate(selectedTeamDate)) {
     showNotice("모든 담당자의 일일보고가 완료되었습니다. " + weeklyCaptureMessage(selectedTeamDate), "", "주간 캡쳐 저장", function() {
-      downloadWeekScreenshot();
       hideNotice();
+      downloadWeekScreenshot();
     }, true, true);
   } else {
-    showNotice("모든 담당자의 일일보고가 완료되었습니다. 스크린샷을 저장해야 넘어갈 수 있습니다.", "", "스크린샷 저장", function() {
-      downloadDayScreenshot();
+    showNotice("모든 담당자의 일일보고가 완료되었습니다.", "", "스크린샷 저장", function() {
       hideNotice();
+      downloadDayScreenshot();
     }, true, true);
   }
 }
@@ -463,10 +466,14 @@ function digits(v) {
   return String(v || "").replace(/[^\d]/g, "");
 }
 function amountMan(v) {
-  return Number(digits(v) || 0);
+  return amountWon(v) / 10000;
 }
 function amountWon(v) {
-  return amountMan(v) * 10000;
+  var text = String(v || "").trim().replace(/,/g, "");
+  if (!/^\d+(?:\.\d{0,4})?$/.test(text)) return 0;
+  var parts = text.split(".");
+  var value = Number(parts[0]) * 10000 + Number(((parts[1] || "") + "0000").slice(0, 4));
+  return Number.isSafeInteger(value) ? value : 0;
 }
 function won(v) {
   var n = Number(v || 0);
@@ -474,7 +481,7 @@ function won(v) {
 }
 function wonMan(v) {
   var n = Number(v || 0);
-  return n ? money.format(Math.round(n / 10000)) + "만원" : "0원";
+  return n ? (n / 10000).toLocaleString("ko-KR", { maximumFractionDigits: 4 }) + "만원" : "0원";
 }
 function yearOf(x) {
   return x.date ? Number(String(x.date).slice(0, 4)) : currentYear;
@@ -608,8 +615,7 @@ function appendClientMeta(parent, item) {
 }
 function applyClientMatch(item) {
   if (!item) return;
-  if (clientLookupTimer) clearTimeout(clientLookupTimer);
-  clientLookupSeq += 1;
+  cancelClientLookup();
   lastSelectedClientMatch = item;
   if (clientCodeInput) clientCodeInput.value = item.code || "";
   if (clientInput) clientInput.value = item.client || "";
@@ -665,10 +671,11 @@ function renderClientSuggestions(box, items, mode) {
   box.classList.add("active");
 }
 async function loadClientSuggestions(mode) {
+  cancelClientLookup();
+  var seq = clientLookupSeq;
   var input = clientInput;
   var box = clientSuggestions;
   var term = clientLookupTerm(input ? input.value : "");
-  var seq = ++clientLookupSeq;
   if (term.length < 2) {
     hideClientSuggestions(box);
     return;
@@ -686,20 +693,16 @@ async function loadClientSuggestions(mode) {
   }
 }
 function scheduleClientLookup(mode) {
-  if (clientLookupTimer) clearTimeout(clientLookupTimer);
-  clientLookupSeq += 1;
-  if (clientLookupTerm(clientInput.value).length < 2) {
-    hideClientSuggestions(clientSuggestions);
-    return;
-  }
+  cancelClientLookup();
+  hideAllClientSuggestions();
+  if (clientLookupTerm(clientInput.value).length < 2) return;
   renderClientSuggestionMessage(clientSuggestions, "검색 중입니다.");
   clientLookupTimer = setTimeout(function() {
     loadClientSuggestions(mode);
   }, 180);
 }
 function clearClientCode() {
-  if (clientLookupTimer) clearTimeout(clientLookupTimer);
-  clientLookupSeq += 1;
+  cancelClientLookup();
   lastSelectedClientMatch = null;
   if (clientCodeInput) clientCodeInput.value = "";
   if (branchInput) branchInput.value = "";
@@ -746,16 +749,7 @@ function branchLooksSame(a, b) {
 function reportClientLooksLikeDirectoryItem(reportClient, directoryItem) {
   var reportKey = clientCompareKey(reportClient);
   var clientKey = clientCompareKey(directoryItem && directoryItem.client);
-  var branchKey = normalizeBranchKey(directoryItem && directoryItem.branch);
-  var branchTextKey = lookupKey(directoryItem && directoryItem.branch);
-  if (!reportKey || !clientKey) return false;
-  if (reportKey === clientKey) return true;
-  if (reportKey.length >= 5 && clientKey.indexOf(reportKey) >= 0) return true;
-  if (clientKey.length >= 5 && reportKey.indexOf(clientKey) >= 0) return true;
-  if (!branchKey) return false;
-  return reportKey === branchTextKey + clientKey ||
-    reportKey === clientKey + branchTextKey ||
-    (reportKey.indexOf(clientKey) >= 0 && reportKey.indexOf(branchKey) >= 0);
+  return Boolean(reportKey && clientKey && reportKey === clientKey);
 }
 async function loadClientDirectory() {
   if (clientDirectory.length) return clientDirectory;
@@ -778,7 +772,7 @@ function uniqueClientDirectoryMatch(report) {
   var codeText = itemClientCode(report);
   if (codeText) {
     var codeMatches = clientDirectory.filter(function(item) {
-      return lookupKey(item.code) === lookupKey(codeText);
+      return lookupKey(item.code) === lookupKey(codeText) && reportClientLooksLikeDirectoryItem(report.client, item);
     });
     if (branchText) {
       codeMatches = codeMatches.filter(function(item) {
@@ -888,8 +882,8 @@ async function loadManualClientResults() {
   }
 }
 function scheduleManualClientLookup() {
-  if (manualClientLookupTimer) clearTimeout(manualClientLookupTimer);
   manualClientLookupSeq += 1;
+  if (manualClientLookupTimer) clearTimeout(manualClientLookupTimer);
   if (clientLookupTerm(manualClientSearch.value).length < 2) {
     renderManualClientResultMessage("두 글자 이상 입력하면 검색합니다.");
     return;
@@ -974,9 +968,9 @@ function openManualClientModal(term, resumeSubmit, showAdd) {
   }, 0);
 }
 function closeManualClientModal() {
-  if (!manualClientOverlay) return;
-  if (manualClientLookupTimer) clearTimeout(manualClientLookupTimer);
   manualClientLookupSeq += 1;
+  if (manualClientLookupTimer) clearTimeout(manualClientLookupTimer);
+  if (!manualClientOverlay) return;
   manualClientOverlay.classList.remove("active");
   manualClientOverlay.setAttribute("aria-hidden", "true");
   resumeSubmitAfterClientSelection = false;
@@ -1638,11 +1632,22 @@ async function requestJson(url, options, timeoutMs) {
   var finishActivity = beginNetworkActivity(url, options && options.method);
   var controller = typeof AbortController !== "undefined" ? new AbortController() : null;
   var timer = controller ? setTimeout(function() { controller.abort(); }, timeoutMs || 12000) : null;
-  if (controller) options.signal = controller.signal;
+  if (controller) {
+    if (options.signal) {
+      if (options.signal.aborted) controller.abort();
+      else options.signal.addEventListener("abort", function() { controller.abort(); }, { once: true });
+    }
+    options.signal = controller.signal;
+  }
   try {
     var response = await fetch(url, options);
     var data = await response.json().catch(function() { return {}; });
-    if (!response.ok) throw new Error(data.error || "요청 실패");
+    if (!response.ok) {
+      var failure = new Error(data.error || "요청 실패");
+      failure.code = data.code;
+      failure.status = response.status;
+      throw failure;
+    }
     return data;
   } catch (error) {
     if (error.name === "AbortError") {
@@ -1655,9 +1660,45 @@ async function requestJson(url, options, timeoutMs) {
   }
 }
 async function api(method, body, query) {
+  var mutation = prepareMutation("reports", method, body, query);
+  body = mutation.body;
+  query = mutation.query;
   var options = { method: method, headers: { "Content-Type": "application/json" } };
   if (body) options.body = JSON.stringify(body);
-  return requestJson("/api/reports" + (query || ""), options, 12000);
+  var result = await requestJson("/api/reports" + (query || ""), options, 20000);
+  if (mutation.key) delete pendingMutations[mutation.key];
+  return result;
+}
+var pendingMutations = {};
+var reportDraftId = "";
+var reportSaving = false;
+var editingVersion = null;
+var successCaseVersion = null;
+var successCaseSaving = false;
+var exhibitionDraftId = "";
+var exhibitionVersion = null;
+var exhibitionSaving = false;
+var calendarLoading = true;
+function disableControls(container) {
+  var controls = Array.from(container.elements || container.querySelectorAll("input, select, textarea, button")).map(function(control) {
+    var wasDisabled = control.disabled;
+    control.disabled = true;
+    return { control: control, disabled: wasDisabled };
+  });
+  return function() { controls.forEach(function(item) { item.control.disabled = item.disabled; }); };
+}
+function prepareMutation(resource, method, body, query) {
+  if (method === "GET") return { body: body, query: query };
+  var data = Object.assign({}, body || {});
+  var params = new URLSearchParams(query || "");
+  if (method === "DELETE") data = Object.fromEntries(params.entries());
+  if (method !== "POST" && data.expectedUpdatedAt == null) data.expectedUpdatedAt = data.updatedAt;
+  delete data.updatedAt;
+  delete data.createdAt;
+  var key = resource + method + JSON.stringify(data);
+  data.operationId = pendingMutations[key] || (pendingMutations[key] = makeId());
+  if (method === "DELETE") return { key: key, body: null, query: "?" + new URLSearchParams(data).toString() };
+  return { key: key, body: data, query: query };
 }
 async function completionApi(method, body, query) {
   var options = { method: method, headers: { "Content-Type": "application/json" } };
@@ -1670,9 +1711,14 @@ async function holidayApi(method, body, query) {
   return requestJson("/api/holidays" + (query || ""), options, 8000);
 }
 async function exhibitionApi(method, body, query) {
+  var mutation = prepareMutation("exhibitions", method, body, query);
+  body = mutation.body;
+  query = mutation.query;
   var options = { method: method, headers: { "Content-Type": "application/json" } };
   if (body) options.body = JSON.stringify(body);
-  return requestJson("/api/exhibitions" + (query || ""), options, 8000);
+  var result = await requestJson("/api/exhibitions" + (query || ""), options, 20000);
+  if (mutation.key) delete pendingMutations[mutation.key];
+  return result;
 }
 function exhibitionErrorMessage(error) {
   var message = error && error.message ? error.message : String(error || "");
@@ -1682,12 +1728,15 @@ function exhibitionErrorMessage(error) {
   return message;
 }
 async function loadCalendarDays(skipRender) {
+  calendarLoading = true;
   try {
     teamCalendarDays = await holidayApi("GET");
     calendarLoadError = "";
   } catch (error) {
     teamCalendarDays = [];
     calendarLoadError = error.message;
+  } finally {
+    calendarLoading = false;
   }
   if (!skipRender) render();
 }
@@ -1706,7 +1755,6 @@ async function loadExhibitions() {
     exhibitionEvents = await exhibitionApi("GET");
     exhibitionLoadError = "";
   } catch (error) {
-    exhibitionEvents = [];
     exhibitionLoadError = error.message;
   }
   renderExhibitionForm();
@@ -1714,18 +1762,19 @@ async function loadExhibitions() {
 }
 async function loadData() {
   status("보고 데이터를 불러오는 중입니다.", "");
-  var loaded = await Promise.all([
-    api("GET"),
+  var supportingData = Promise.all([
     loadCalendarDays(true),
-    loadCompletionsForSelectedDate(true),
-    loadExhibitions()
+    loadCompletionsForSelectedDate(true)
   ]);
-  reports = loaded[0];
+  reports = await api("GET");
   status("", "");
+  render();
+  await supportingData;
   render();
 }
 async function addData(item, skipNotice) {
   var saved = await api("POST", item);
+  reports = reports.filter(function(report) { return report.id !== saved.id; });
   reports.unshift(saved);
   render();
   if (!skipNotice) showNotice("저장되었습니다.");
@@ -1749,7 +1798,7 @@ async function deleteData(id) {
     return;
   }
   var actor = ownerInput.value.trim() || localStorage.getItem("ownerName") || item.owner || "";
-  await api("DELETE", null, "?id=" + encodeURIComponent(id) + "&actor=" + encodeURIComponent(actor));
+  await api("DELETE", null, "?id=" + encodeURIComponent(id) + "&actor=" + encodeURIComponent(actor) + "&expectedUpdatedAt=" + item.updatedAt);
   reports = reports.filter(function(report) {
     return report.id !== id;
   });
@@ -1769,11 +1818,9 @@ function askCompleteAfterSave(owner, reportDate) {
   });
 }
 async function togglePrescription(item) {
-  var next = Object.assign({}, item, {
-    prescriptionDone: !item.prescriptionDone,
-    updatedAt: Date.now()
-  });
-  await updateData(next);
+  var saved = await api("PATCH", { id: item.id, expectedUpdatedAt: item.updatedAt, prescriptionDone: !item.prescriptionDone, actor: ownerInput.value });
+  reports = reports.map(function(report) { return report.id === saved.id ? saved : report; });
+  render();
 }
 
 function summarize(items) {
@@ -2882,6 +2929,8 @@ function renderExhibitionForm() {
   if (exhibitionSaveBtn) exhibitionSaveBtn.textContent = exhibitionEditingId ? "수정 저장" : "저장";
 }
 function resetExhibitionForm() {
+  exhibitionDraftId = "";
+  exhibitionVersion = null;
   exhibitionEditingId = "";
   rerollExhibitionTieOrder();
   setLeaveDateInput(exhibitionDateInput, "");
@@ -3203,6 +3252,9 @@ function renderExhibitionList(message) {
   });
 }
 function startEditExhibition(event) {
+  if (exhibitionSaving) return;
+  exhibitionDraftId = "";
+  exhibitionVersion = event.updatedAt;
   exhibitionEditingId = event.id;
   setExhibitionFormVisible(true);
   var days = normalizeEventDays(event);
@@ -3240,6 +3292,7 @@ function closeExhibitionModal() {
   exhibitionOverlay.setAttribute("aria-hidden", "true");
 }
 async function saveExhibitionEvent() {
+  if (exhibitionSaving) return;
   var date = leaveDateValue(exhibitionDateInput);
   var title = exhibitionNameInput ? exhibitionNameInput.value.trim() : "";
   var days = exhibitionDraftDays();
@@ -3261,8 +3314,12 @@ async function saveExhibitionEvent() {
     return;
   }
 
+  exhibitionSaving = true;
+  var restoreExhibitionControls = disableControls(exhibitionOverlay);
+  try {
   var saved = await exhibitionApi("POST", {
-    id: exhibitionEditingId,
+    id: exhibitionEditingId || (exhibitionDraftId || (exhibitionDraftId = makeId())),
+    expectedUpdatedAt: exhibitionEditingId ? exhibitionVersion : null,
     date: days[0].date,
     title: title,
     neededCount: days[0].neededCount || 2,
@@ -3283,9 +3340,12 @@ async function saveExhibitionEvent() {
   setExhibitionFormVisible(false);
   renderExhibitionList();
   showNotice("전시회 참석 기록을 저장했습니다.");
+  } finally { exhibitionSaving = false; restoreExhibitionControls(); }
 }
 async function deleteExhibitionEvent(id) {
-  await exhibitionApi("DELETE", null, "?id=" + encodeURIComponent(id));
+  var current = exhibitionEvents.find(function(event) { return event.id === id; });
+  if (!current || exhibitionSaving) return;
+  await exhibitionApi("DELETE", null, "?id=" + encodeURIComponent(id) + "&expectedUpdatedAt=" + current.updatedAt);
   exhibitionEvents = exhibitionEvents.filter(function(event) {
     return event.id !== id;
   });
@@ -3867,6 +3927,8 @@ function scrollOpenedOwnerIntoView(container, owner) {
   }, 0);
 }
 function openSuccessCaseModal(item) {
+  if (successCaseSaving) return;
+  successCaseVersion = item.updatedAt;
   successCaseEditingId = item.id;
   if (successCaseClient) successCaseClient.textContent = item.owner + " · " + item.client;
   if (successCaseText) successCaseText.value = item.successCase || "";
@@ -3885,24 +3947,30 @@ function closeSuccessCaseModal() {
   successCaseOverlay.setAttribute("aria-hidden", "true");
 }
 async function saveSuccessCase() {
+  if (successCaseSaving) return;
   var item = reports.find(function(report) { return report.id === successCaseEditingId; });
   if (!item) {
     showNotice("성공사례를 저장할 거래처를 찾지 못했습니다.", "danger");
     return;
   }
   var actor = ownerInput.value.trim() || localStorage.getItem("ownerName") || item.owner || "";
-  var next = Object.assign({}, item, {
+  var next = {
+    id: item.id,
+    expectedUpdatedAt: successCaseVersion,
     successCase: successCaseText ? successCaseText.value.trim() : "",
-    updatedAt: Date.now(),
     actor: actor
-  });
-  var saved = await api("PUT", next);
+  };
+  successCaseSaving = true;
+  var restoreSuccessControls = disableControls(successCaseOverlay);
+  try {
+  var saved = await api("PATCH", next);
   reports = reports.map(function(report) {
     return report.id === saved.id ? saved : report;
   });
   closeSuccessCaseModal();
   render();
   showNotice("성공사례를 저장했습니다.");
+  } finally { successCaseSaving = false; restoreSuccessControls(); }
 }
 function productSummary(items) {
   var rows = [
@@ -4369,12 +4437,100 @@ function teamGroupsForScreenshot(items) {
   });
 }
 function downloadCanvas(canvas, filename) {
+  var imageUrl = canvas.toDataURL("image/png");
+  if (imageUrl.indexOf("data:image/png;base64,") !== 0) throw new Error("PNG 생성 실패");
+  openScreenshotPreview(imageUrl, filename);
+}
+function downloadScreenshotImage(imageUrl, filename) {
   var link = document.createElement("a");
-  link.href = canvas.toDataURL("image/png");
+  link.href = imageUrl;
   link.download = filename;
   document.body.appendChild(link);
   link.click();
   link.remove();
+}
+function openScreenshotPreview(imageUrl, filename) {
+  var dialog = document.getElementById("screenshotDialog");
+  var image = document.getElementById("screenshotImage");
+  var message = document.getElementById("screenshotMessage");
+  var shareButton = document.getElementById("screenshotShareBtn");
+  var expandButton = document.getElementById("screenshotExpandBtn");
+  var file = null;
+  try {
+    if (typeof navigator.share === "function" && typeof navigator.canShare === "function") {
+      var binary = atob(imageUrl.split(",")[1]);
+      var bytes = new Uint8Array(binary.length);
+      for (var i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+      var candidate = new File([bytes], filename, { type: "image/png" });
+      if (navigator.canShare({ files: [candidate] })) file = candidate;
+    }
+  } catch (error) {
+    file = null;
+  }
+  image.src = imageUrl;
+  image.alt = filename.replace(/\.png$/, "");
+  message.textContent = "";
+  shareButton.hidden = !file;
+  shareButton.disabled = false;
+  function setExpanded(expanded) {
+    dialog.classList.toggle("is-expanded", expanded);
+    if (expanded) {
+      image.tabIndex = 0;
+      image.setAttribute("role", "button");
+      image.setAttribute("aria-label", "캡처 미리보기로 돌아가기");
+      image.focus();
+    } else {
+      image.removeAttribute("tabindex");
+      image.removeAttribute("role");
+      image.removeAttribute("aria-label");
+      if (dialog.open) expandButton.focus();
+    }
+  }
+  setExpanded(false);
+  expandButton.onclick = function() { setExpanded(true); };
+  image.onclick = function() {
+    if (dialog.classList.contains("is-expanded")) setExpanded(false);
+  };
+  image.onkeydown = function(event) {
+    if (dialog.classList.contains("is-expanded") && (event.key === "Enter" || event.key === " ")) {
+      event.preventDefault();
+      setExpanded(false);
+    }
+  };
+  dialog.oncancel = function(event) {
+    if (dialog.classList.contains("is-expanded")) {
+      event.preventDefault();
+      setExpanded(false);
+    }
+  };
+  dialog.onclose = function() {
+    setExpanded(false);
+    image.removeAttribute("src");
+    shareButton.onclick = null;
+    document.getElementById("screenshotDownloadBtn").onclick = null;
+  };
+  document.getElementById("screenshotCloseBtn").onclick = function() { dialog.close(); };
+  document.getElementById("screenshotDownloadBtn").onclick = function() {
+    try {
+      downloadScreenshotImage(imageUrl, filename);
+    } catch (error) {
+      message.textContent = "이미지 다운로드를 시작하지 못했습니다.";
+    }
+  };
+  async function shareImage() {
+    if (!file || shareButton.disabled) return;
+    shareButton.disabled = true;
+    message.textContent = "";
+    try {
+      await navigator.share({ files: [file] });
+    } catch (error) {
+      message.textContent = error && error.name === "AbortError" ? "" : "공유 창을 열지 못했습니다. 캡처 이미지는 유지됩니다.";
+    } finally {
+      shareButton.disabled = false;
+    }
+  }
+  shareButton.onclick = shareImage;
+  dialog.showModal();
 }
 function drawRoundedBox(ctx, x, y, w, h, color, stroke) {
   ctx.fillStyle = color;
@@ -4476,10 +4632,20 @@ function makeTeamScreenshot(period) {
   return canvas;
 }
 function downloadDayScreenshot() {
-  downloadCanvas(makeTeamScreenshot("day"), "일일현황-" + selectedTeamDate + ".png");
+  saveTeamScreenshot("day", "일일현황-" + selectedTeamDate + ".png");
 }
 function downloadWeekScreenshot() {
-  downloadCanvas(makeTeamScreenshot("week"), "주간현황-" + weekLabelFromStart(selectedWeekStart).replace(/\s+/g, "") + ".png");
+  saveTeamScreenshot("week", "주간현황-" + weekLabelFromStart(selectedWeekStart).replace(/\s+/g, "") + ".png");
+}
+function saveTeamScreenshot(period, filename) {
+  try {
+    downloadCanvas(makeTeamScreenshot(period), filename);
+  } catch (error) {
+    showNotice("캡처 이미지를 만들지 못했습니다.", "danger", "다시 시도", function() {
+      hideNotice();
+      saveTeamScreenshot(period, filename);
+    });
+  }
 }
 function render() {
   var items = monthlyItems();
@@ -4523,6 +4689,8 @@ function render() {
 }
 function resetAfterSave() {
   editingTarget = null;
+  reportDraftId = "";
+  editingVersion = null;
   editingId = "";
   clientInput.value = "";
   clearClientCode();
@@ -4539,6 +4707,8 @@ function resetAfterSave() {
 function resetFormAll() {
   if (reportSaving) return;
   editingTarget = null;
+  reportDraftId = "";
+  editingVersion = null;
   editingId = "";
   clientInput.value = "";
   clearClientCode();
@@ -4588,6 +4758,8 @@ function syncViewForLayout() {
 function startEdit(item) {
   if (reportSaving) return;
   editingTarget = { client: item.client, owner: item.owner, date: item.date };
+  reportDraftId = "";
+  editingVersion = item.updatedAt;
   editingId = item.id;
   ownerInput.value = item.owner;
   setLeaveDateInput(dateInput, item.date);
@@ -4599,7 +4771,7 @@ function startEdit(item) {
   productInput.value = item.product || "";
   updateProductSelectionSummary();
   renderProductOptions();
-  amountInput.value = String(Math.round(Number(item.amount || 0) / 10000));
+  amountInput.value = String(Number(item.amount || 0) / 10000);
   selectedType = item.type;
   collectionYear = collectionYearOf(item);
   collectionMonth = collectionMonthOf(item);
@@ -4808,7 +4980,9 @@ if (menuExhibitionBtn) {
 if (menuCodeReviewBtn) {
   menuCodeReviewBtn.addEventListener("click", function() {
     closeAdminMenu();
-    setActiveView("codes", true);
+    setActiveView("codes", false);
+    var panel = document.getElementById("codePanel");
+    if (panel) panel.scrollIntoView({ behavior: "smooth", block: "start" });
   });
 }
 document.addEventListener("click", function(e) {
@@ -4902,31 +5076,32 @@ if (manualClientAddToggleBtn) {
 }
 if (clientInput) {
   clientInput.addEventListener("input", function() {
+    cancelClientLookup();
+    clearClientMatchStatus();
     lastSelectedClientMatch = null;
     if (clientCodeInput) clientCodeInput.value = "";
     if (branchInput) branchInput.value = "";
-    clearClientMatchStatus();
-    scheduleClientLookup("name");
+    if (clientLookupTerm(clientInput.value).length >= 2) scheduleClientLookup("name");
+    else hideClientSuggestions(clientSuggestions);
   });
   clientInput.addEventListener("keydown", function(e) {
-    if (e.key === "Escape") {
-      clearTimeout(clientLookupTimer);
-      clientLookupSeq += 1;
-      hideClientSuggestions(clientSuggestions);
-    }
+    if (e.key === "Escape") { cancelClientLookup(); hideClientSuggestions(clientSuggestions); }
   });
 }
 if (clientCodeInput) {
   clientCodeInput.addEventListener("input", function() {
+    cancelClientLookup();
     lastSelectedClientMatch = null;
     if (clientLookupTerm(clientCodeInput.value).length >= 2) scheduleClientLookup("code");
     else hideClientSuggestions(clientCodeSuggestions);
   });
   clientCodeInput.addEventListener("keydown", function(e) {
-    if (e.key === "Escape") hideClientSuggestions(clientCodeSuggestions);
+    if (e.key === "Escape") { cancelClientLookup(); hideClientSuggestions(clientCodeSuggestions); }
   });
 }
 ownerInput.addEventListener("change", function() {
+  clearClientCode();
+  manualClientLookupSeq += 1;
   var owner = ownerInput.value.trim();
   if (ownerNames.indexOf(owner) >= 0) {
     localStorage.setItem("ownerName", owner);
@@ -4941,12 +5116,12 @@ ownerInput.addEventListener("change", function() {
   render();
 });
 amountInput.addEventListener("input", function() {
-  amountInput.value = digits(amountInput.value);
+  amountInput.value = amountInput.value.replace(/[^\d.]/g, "");
   updateAmountPreview();
 });
 document.querySelectorAll("[data-add-amount]").forEach(function(button) {
   button.addEventListener("click", function() {
-    amountInput.value = String(amountMan(amountInput.value) + Number(button.dataset.addAmount || 0));
+    amountInput.value = String((amountWon(amountInput.value) + Number(button.dataset.addAmount || 0) * 10000) / 10000);
     updateAmountPreview();
   });
 });
@@ -5170,9 +5345,15 @@ form.addEventListener("submit", async function(e) {
     return;
   }
 
+  if (calendarLoading || calendarLoadError) {
+    showNotice(calendarLoading ? "휴일 정보를 확인 중입니다. 잠시 후 저장해주세요." : "휴일 정보를 불러오지 못했습니다. 새로고침 후 다시 저장해주세요.", "danger");
+    return;
+  }
+
   var old = reports.find(function(report) { return report.id === editingId; }) || {};
   var item = {
-    id: editingId || makeId(),
+    id: editingId || (reportDraftId || (reportDraftId = makeId())),
+    expectedUpdatedAt: editingId ? editingVersion : null,
     createdAt: old.createdAt || Date.now(),
     updatedAt: Date.now(),
     date: reportDate,
@@ -5201,14 +5382,12 @@ form.addEventListener("submit", async function(e) {
     if (!keepSaving) return;
   }
 
+  reportSaving = true;
+  var restoreFormControls = disableControls(form);
+  var submitButton = document.getElementById("submitBtn");
+  submitButton.disabled = true;
   try {
     var wasEditing = Boolean(editingId);
-    reportSaving = true;
-    var savedControlStates = Array.from(form.elements).map(function(control) {
-      var disabled = control.disabled;
-      control.disabled = true;
-      return { control: control, disabled: disabled };
-    });
     if (wasEditing) await updateData(item);
     else {
       await addData(item, true);
@@ -5220,13 +5399,57 @@ form.addEventListener("submit", async function(e) {
     toast(error.message);
   } finally {
     reportSaving = false;
-    if (savedControlStates) savedControlStates.forEach(function(item) { item.control.disabled = item.disabled; });
+    restoreFormControls();
+    submitButton.disabled = false;
   }
 });
 
 syncMonthPicker();
 setDefaultWeeklyReportRange();
 updateAmountPreview();
+var clientMatchReviewBtn = document.getElementById("clientMatchReviewBtn");
+if (clientMatchReviewBtn) clientMatchReviewBtn.addEventListener("click", async function() {
+  var box = document.getElementById("clientMatchReview");
+  clientMatchReviewBtn.disabled = true;
+  box.textContent = "연결 후보를 확인하는 중입니다.";
+  try {
+    var response = await requestJson("/api/import-clients?mode=review", { method: "GET" }, 20000);
+    box.textContent = "";
+    if (!response.items.length) box.textContent = "변경할 연결 후보가 없습니다.";
+    response.items.forEach(function(candidate) {
+      var row = document.createElement("article");
+      var name = document.createElement("strong");
+      name.textContent = candidate.owner + " · " + candidate.client;
+      var before = document.createElement("p");
+      before.textContent = [candidate.clientCode || "코드 없음", candidate.branchName || "지점 없음"].join(" · ");
+      var after = document.createElement("p");
+      after.textContent = candidate.next
+        ? "변경 후보: " + [candidate.next.client, candidate.next.code, candidate.next.branch].join(" · ")
+        : candidate.reason;
+      row.append(name, before, after);
+      {
+        var button = document.createElement("button");
+        button.className = "btn";
+        button.type = "button";
+        button.textContent = candidate.next ? "수정하기" : "거래처 찾기";
+        button.addEventListener("click", function() {
+          var report = reports.find(function(item) { return item.id === candidate.id; });
+          if (!report || Number(report.updatedAt) !== Number(candidate.expectedUpdatedAt)) {
+            showNotice("보고가 변경되었습니다. 새로고침 후 다시 확인해주세요.", "danger");
+            return;
+          }
+          startEdit(report);
+          if (candidate.next) applyClientMatch(candidate.next);
+          setActiveView(isDesktopLayout() ? "dashboard" : "form", true);
+          if (!candidate.next) openManualClientModal(report.client, false, false);
+        });
+        row.appendChild(button);
+      }
+      box.appendChild(row);
+    });
+  } catch(error) { box.textContent = error.message; }
+  finally { clientMatchReviewBtn.disabled = false; }
+});
 loadData().catch(function(error) {
   status("연결 실패: " + error.message, "error");
 });

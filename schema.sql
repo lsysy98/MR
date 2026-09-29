@@ -5,6 +5,7 @@ create table if not exists public.reports (
   report_date date not null,
   owner text not null,
   client text not null,
+  client_code text,
   branch_name text,
   type text not null check (type in ('신규', '매출증대')),
   product text not null check (product in ('3제+클로르', '3제', '클로르')),
@@ -23,6 +24,9 @@ alter table public.reports
 
 alter table public.reports
   add column if not exists collection_month integer check (collection_month between 1 and 12);
+
+alter table public.reports
+  add column if not exists client_code text;
 
 alter table public.reports
   add column if not exists branch_name text;

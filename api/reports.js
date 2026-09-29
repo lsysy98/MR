@@ -1,243 +1,72 @@
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const ADMIN_KEY = process.env.ADMIN_KEY || "";
-const {
-  hasSalesPlanConfig,
-  notifyDailyReportChange,
-  retryPendingSalesPlanEvents
-} = require("./sales-plan-integration");
-
-function cleanSupabaseUrl() {
-  if (!SUPABASE_URL) return "";
-  return SUPABASE_URL
-    .trim()
-    .replace(/\/rest\/v1\/?$/i, "")
-    .replace(/\/+$/g, "");
-}
-
-function json(res, status, data) {
-  res.statusCode = status;
-  res.setHeader("Content-Type", "application/json; charset=utf-8");
-  res.end(JSON.stringify(data));
-}
-
-async function supabase(path, options = {}) {
-  const baseUrl = cleanSupabaseUrl();
-
-  if (!baseUrl || !SUPABASE_SERVICE_ROLE_KEY) {
-    throw new Error("Supabase environment variables are missing.");
-  }
-
-  if (!/^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(baseUrl)) {
-    throw new Error("SUPABASE_URL must look like https://xxxx.supabase.co");
-  }
-
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 12000);
-  let response;
-  try {
-    response = await fetch(`${baseUrl}/rest/v1/${path}`, {
-      ...options,
-      signal: controller.signal,
-      headers: {
-        apikey: SUPABASE_SERVICE_ROLE_KEY,
-        Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-        "Content-Type": "application/json",
-        Prefer: "return=representation",
-        ...(options.headers || {})
-      }
-    });
-  } catch (error) {
-    if (error.name === "AbortError") {
-      throw new Error("Supabase response timed out.");
-    }
-    throw error;
-  } finally {
-    clearTimeout(timer);
-  }
-
-  const text = await response.text();
-  const data = text ? JSON.parse(text) : null;
-
-  if (!response.ok) {
-    throw new Error(data?.message || text || "Supabase request failed.");
-  }
-
-  return data;
-}
-
-function toDb(item, includeClientCode = true) {
-  const row = {
-    id: item.id,
-    created_at: Number(item.createdAt || Date.now()),
-    updated_at: Number(item.updatedAt || Date.now()),
-    report_date: item.date,
-    owner: item.owner,
-    client: item.client,
-    branch_name: item.branchName || "",
-    type: item.type,
-    product: item.product,
-    amount: Number(item.amount || 0),
-    collection_year: item.collectionYear ? Number(item.collectionYear) : null,
-    collection_month: item.collectionMonth ? Number(item.collectionMonth) : null,
-    prescription_done: Boolean(item.prescriptionDone),
-    success_case: item.successCase || ""
-  };
-  if (includeClientCode) row.client_code = item.clientCode || "";
-  return row;
-}
+const { supabase, readAll, cleanSupabaseUrl, json, readBody, errorResponse } = require('../lib/storage');
+const { hasSalesPlanConfig, retryPendingSalesPlanEvents } = require('./sales-plan-integration');
 
 function fromDb(row) {
   return {
-    id: row.id,
-    createdAt: Number(row.created_at),
-    updatedAt: Number(row.updated_at),
-    date: row.report_date,
-    owner: row.owner,
-    client: row.client,
-    clientCode: row.client_code || "",
-    branchName: row.branch_name || "",
-    type: row.type,
-    product: row.product,
-    amount: Number(row.amount || 0),
-    collectionYear: row.collection_year ? Number(row.collection_year) : null,
-    collectionMonth: row.collection_month ? Number(row.collection_month) : null,
-    prescriptionDone: Boolean(row.prescription_done),
-    successCase: row.success_case || ""
+    id: row.id, createdAt: Number(row.created_at), updatedAt: Number(row.updated_at),
+    date: row.report_date, owner: row.owner, client: row.client,
+    clientCode: row.client_code || '', branchName: row.branch_name || '',
+    type: row.type, product: row.product, amount: Number(row.amount),
+    collectionYear: row.collection_year, collectionMonth: row.collection_month,
+    prescriptionDone: Boolean(row.prescription_done), successCase: row.success_case || ''
   };
 }
-function missingClientCodeColumn(error) {
-  return /client_code|schema cache|column/i.test(error?.message || "");
-}
-async function writeReport(path, method, item) {
-  try {
-    return await supabase(path, {
-      method,
-      body: JSON.stringify(toDb(item, true))
-    });
-  } catch (error) {
-    if (!missingClientCodeColumn(error)) throw error;
-    return await supabase(path, {
-      method,
-      body: JSON.stringify(toDb(item, false))
-    });
-  }
-}
-function logRow(action, actor, beforeRow, afterRow) {
-  const beforeData = beforeRow ? fromDb(beforeRow) : null;
-  const afterData = afterRow ? fromDb(afterRow) : null;
-  return {
-    action,
-    created_at: Date.now(),
-    actor: actor || afterData?.owner || beforeData?.owner || "",
-    report_id: afterData?.id || beforeData?.id || "",
-    client: afterData?.client || beforeData?.client || "",
-    before_data: beforeData,
-    after_data: afterData
+function reportFields(item, partial) {
+  const fields = {
+    date: 'report_date', owner: 'owner', client: 'client', clientCode: 'client_code',
+    branchName: 'branch_name', type: 'type', product: 'product', amount: 'amount',
+    collectionYear: 'collection_year', collectionMonth: 'collection_month',
+    prescriptionDone: 'prescription_done', successCase: 'success_case'
   };
-}
-async function writeLog(action, actor, beforeRow, afterRow) {
-  try {
-    await supabase("report_logs", {
-      method: "POST",
-      body: JSON.stringify(logRow(action, actor, beforeRow, afterRow))
-    });
-  } catch (error) {
-    console.warn("report log skipped:", error.message);
+  const row = { id: item.id };
+  for (const [key, column] of Object.entries(fields)) {
+    if (partial && !['prescriptionDone', 'successCase'].includes(key)) continue;
+    if (Object.prototype.hasOwnProperty.call(item, key)) row[column] = item[key];
   }
-}
-
-async function readBody(req) {
-  if (req.body && typeof req.body === "object") return req.body;
-  if (typeof req.body === "string") return JSON.parse(req.body || "{}");
-
-  return await new Promise((resolve, reject) => {
-    let raw = "";
-    req.on("data", chunk => { raw += chunk; });
-    req.on("end", () => {
-      try {
-        resolve(raw ? JSON.parse(raw) : {});
-      } catch (error) {
-        reject(error);
-      }
-    });
-    req.on("error", reject);
-  });
+  if ('amount' in row && (!Number.isSafeInteger(row.amount) || row.amount < 0)) throw new Error('invalid_request');
+  if ('client_code' in row && typeof row.client_code !== 'string') throw new Error('invalid_request');
+  return row;
 }
 
 module.exports = async function handler(req, res) {
   try {
-    const requestUrl = new URL(req.url, "http://localhost");
-
-    if (req.method === "GET" && requestUrl.searchParams.get("debug") === "1") {
-      const baseUrl = cleanSupabaseUrl();
+    const url = new URL(req.url, 'http://localhost');
+    if (req.method === 'GET' && url.searchParams.get('debug') === '1') {
+      const base = cleanSupabaseUrl();
       return json(res, 200, {
-        ok: true,
-        hasSupabaseUrl: Boolean(baseUrl),
-        hasServiceRoleKey: Boolean(SUPABASE_SERVICE_ROLE_KEY),
+        ok: true, hasSupabaseUrl: Boolean(base), hasServiceRoleKey: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
         hasSalesPlanIntegrationUrl: Boolean(process.env.SALES_PLAN_INTEGRATION_URL),
         hasSalesPlanIntegrationApiKey: Boolean(process.env.SALES_PLAN_INTEGRATION_API_KEY),
-        salesPlanIntegrationReady: hasSalesPlanConfig(),
-        supabaseUrlLooksRight: /^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(baseUrl),
-        supabaseUrlStart: baseUrl ? baseUrl.slice(0, 28) : "",
-        message: "Both values must be true. Do not share the service role key."
+        salesPlanIntegrationReady: hasSalesPlanConfig(), integrationDisabledInTest: false,
+        supabaseUrlLooksRight: /^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(base)
       });
     }
-
-    if (req.method === "GET" && requestUrl.searchParams.get("retrySalesPlan") === "1") {
-      const key = requestUrl.searchParams.get("key") || "";
-      if (!ADMIN_KEY || key !== ADMIN_KEY) return json(res, 401, { ok: false, error: "unauthorized" });
-      const result = await retryPendingSalesPlanEvents(supabase, 25);
-      return json(res, 200, { ok: true, result });
+    if (req.method === 'GET' && url.searchParams.get('retrySalesPlan') === '1') {
+      if (!process.env.ADMIN_KEY || url.searchParams.get('key') !== process.env.ADMIN_KEY) return json(res, 401, { error: 'unauthorized' });
+      return json(res, 200, { ok: true, result: await retryPendingSalesPlanEvents(supabase, 25) });
     }
-
-    if (req.method === "GET") {
-      const rows = await supabase("reports?select=*&order=created_at.desc");
+    if (req.method === 'GET') {
+      const rows = await readAll('reports');
+      rows.sort((a, b) => Number(b.created_at) - Number(a.created_at) || a.id.localeCompare(b.id));
       return json(res, 200, rows.map(fromDb));
     }
-
-    if (req.method === "POST") {
-      const item = await readBody(req);
-      const now = Date.now();
-      item.id = item.id || `${now}-${Math.random().toString(16).slice(2)}`;
-      item.createdAt = item.createdAt || now;
-      item.updatedAt = now;
-      const rows = await writeReport("reports", "POST", item);
-      const saved = fromDb(rows[0]);
-      if (!saved.clientCode && item.clientCode) saved.clientCode = item.clientCode;
-      await notifyDailyReportChange(supabase, "create_or_update", saved);
-      return json(res, 201, saved);
-    }
-
-    if (req.method === "PUT") {
-      const item = await readBody(req);
-      const actor = item.actor || item.owner || "";
-      const oldRows = await supabase(`reports?id=eq.${encodeURIComponent(item.id)}&select=*`);
-      item.updatedAt = Date.now();
-      const rows = await writeReport(`reports?id=eq.${encodeURIComponent(item.id)}`, "PATCH", item);
-      await writeLog("update", actor, oldRows[0] || null, rows[0] || null);
-      const saved = fromDb(rows[0]);
-      if (!saved.clientCode && item.clientCode) saved.clientCode = item.clientCode;
-      await notifyDailyReportChange(supabase, "create_or_update", saved);
-      return json(res, 200, saved);
-    }
-
-    if (req.method === "DELETE") {
-      const ids = requestUrl.searchParams.getAll("id");
-      const actor = requestUrl.searchParams.get("actor") || "";
-      if (!ids.length) return json(res, 400, { error: "id is required" });
-
-      for (const id of ids) {
-        const oldRows = await supabase(`reports?id=eq.${encodeURIComponent(id)}&select=*`);
-        await supabase(`reports?id=eq.${encodeURIComponent(id)}`, { method: "DELETE" });
-        await writeLog("delete", actor, oldRows[0] || null, null);
-        await notifyDailyReportChange(supabase, "delete", { id, updatedAt: Date.now() });
-      }
-      return json(res, 200, { ok: true, count: ids.length });
-    }
-
-    return json(res, 405, { error: "Method not allowed" });
-  } catch (error) {
-    return json(res, 500, { error: error.message });
-  }
+    if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) return json(res, 405, { error: 'Method not allowed' });
+    const item = req.method === 'DELETE' ? Object.fromEntries(url.searchParams) : await readBody(req);
+    if (!item.operationId) throw new Error('client_update_required');
+    if (!item.id) throw new Error('invalid_request');
+    const action = req.method === 'POST' ? 'create' : req.method === 'DELETE' ? 'delete' : 'update';
+    const expected = action === 'create' ? null : Number(item.expectedUpdatedAt);
+    if (action !== 'create' && (!Number.isSafeInteger(expected) || expected < 0)) throw new Error('report_conflict');
+    const result = await supabase('rpc/mutate_report_safe', {
+      method: 'POST',
+      body: JSON.stringify({
+        p_action: action, p_report: reportFields(item, req.method === 'PATCH'),
+        p_expected_updated_at: expected, p_operation_id: item.operationId,
+        p_actor: item.actor || item.owner || ''
+      })
+    });
+    // The SQL trigger queues the exact committed version, including deletes and retries.
+    await retryPendingSalesPlanEvents(supabase, 3);
+    return json(res, action === 'create' ? 201 : 200, action === 'delete' ? { ok: true, count: 1 } : fromDb(result.row));
+  } catch (error) { return errorResponse(res, error); }
 };

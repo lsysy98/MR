@@ -86,6 +86,7 @@ function reportLine(data) {
   return [
     `담당자: ${data.owner || ""}`,
     `거래처: ${data.client || ""}`,
+    data.clientCode ? `거래처코드: ${data.clientCode}` : "",
     data.branchName ? `지점: ${data.branchName}` : "",
     `날짜: ${data.date || ""}`,
     `수거월: ${collectionText(data)}`,
@@ -107,6 +108,7 @@ function changedFields(beforeData, afterData) {
   const labels = {
     owner: "담당자",
     client: "거래처",
+    clientCode: "거래처코드",
     branchName: "지점명",
     date: "날짜",
     collectionYear: "수거 연도",

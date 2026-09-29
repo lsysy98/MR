@@ -2478,7 +2478,7 @@
     }
 
   </style>
-  <link rel="stylesheet" href="workspace.css?v=20260929-analytics">
+  <link rel="stylesheet" href="workspace.css?v=20260929-capture-preview">
 </head>
 <body class="view-form workspace">
   <header class="workspace-topbar">
@@ -2579,7 +2579,7 @@
           </label>
           <label>예상 금액
             <div class="amount-wrap">
-              <input id="amount" type="text" inputmode="numeric" required autocomplete="off">
+              <input id="amount" type="text" inputmode="decimal" required autocomplete="off">
               <span class="amount-unit">만원</span>
             </div>
           </label>
@@ -2730,6 +2730,8 @@
           </div>
           <div class="code-review-list" id="codeReviewList"></div>
           <div class="empty" id="codeReviewEmpty">거래처코드가 비어 있는 보고가 없습니다.</div>
+          <button type="button" class="btn" id="clientMatchReviewBtn">연결 변경 미리보기</button>
+          <div id="clientMatchReview" class="client-match-review" aria-live="polite"></div>
         </div>
       </section>
     </section>
@@ -2983,6 +2985,19 @@
       </div>
     </div>
   </div>
+  <dialog class="screenshot-dialog" id="screenshotDialog" aria-labelledby="screenshotTitle">
+    <div class="screenshot-heading">
+      <strong id="screenshotTitle">캡처 이미지</strong>
+      <button class="btn" id="screenshotExpandBtn" type="button" aria-label="크게 보기" title="크게 보기"><svg aria-hidden="true" viewBox="0 0 24 24"><use href="assets/workspace-icons.svg#maximize2"></use></svg></button>
+      <button class="btn" id="screenshotCloseBtn" type="button" aria-label="캡처 닫기" title="닫기"><svg aria-hidden="true" viewBox="0 0 24 24"><use href="assets/workspace-icons.svg#x"></use></svg></button>
+    </div>
+    <div class="screenshot-image-scroll"><img id="screenshotImage" alt="보고 현황 캡처"></div>
+    <p id="screenshotMessage" role="status" aria-live="polite"></p>
+    <div class="screenshot-actions">
+      <button class="btn primary" id="screenshotShareBtn" type="button"><svg aria-hidden="true" viewBox="0 0 24 24"><use href="assets/workspace-icons.svg#arrow-up-right"></use></svg>공유·저장</button>
+      <button class="btn" id="screenshotDownloadBtn" type="button"><svg aria-hidden="true" viewBox="0 0 24 24"><use href="assets/workspace-icons.svg#download"></use></svg>파일 저장</button>
+    </div>
+  </dialog>
   <div class="notice-overlay" id="noticeOverlay" aria-hidden="true">
     <div class="notice-box" role="dialog" aria-modal="true" aria-labelledby="noticeText">
       <strong id="noticeText">저장되었습니다.</strong>
@@ -3005,11 +3020,11 @@
       <footer><button class="btn primary" type="button" id="notificationEnable" disabled>알림 받기</button><div class="tools-actions"><button class="btn" type="button" id="notificationTest" disabled>시험 알림</button><button class="btn" type="button" id="notificationDisable" disabled>이 기기 알림 해제</button></div></footer>
     </section>
   </div>
-  <script src="app.js?v=20260929-analytics"></script>
+  <script src="app.js?v=20260929-capture-preview"></script>
   <script src="site-tools.js?v=20260918-notifications-2"></script>
   <script src="branch-headquarters.js?v=20260929-all-owner-branches"></script>
   <script src="analytics.js?v=20260929-owner-total-order"></script>
-  <script src="workspace.js?v=20260929-analytics"></script>
+  <script src="workspace.js?v=20260928-analytics"></script>
 </body>
 </html>
 

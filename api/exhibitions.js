@@ -1,101 +1,11 @@
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const ADMIN_KEY = process.env.ADMIN_KEY;
+const { supabase, readAll, json, readBody, errorResponse } = require('../lib/storage');
 const PACK_PREFIX = "\n\n__EXHIBITION_DAYS_JSON__";
-
-function cleanSupabaseUrl() {
-  if (!SUPABASE_URL) return "";
-  return SUPABASE_URL
-    .trim()
-    .replace(/\/rest\/v1\/?$/i, "")
-    .replace(/\/+$/g, "");
-}
-
-function json(res, status, data) {
-  res.statusCode = status;
-  res.setHeader("Content-Type", "application/json; charset=utf-8");
-  res.end(JSON.stringify(data));
-}
-
-function requireAdmin(req) {
-  const requestUrl = new URL(req.url, "http://localhost");
-  const key = requestUrl.searchParams.get("key") || "";
-  return Boolean(ADMIN_KEY && key === ADMIN_KEY);
-}
-
-async function supabase(path, options = {}) {
-  const baseUrl = cleanSupabaseUrl();
-  if (!baseUrl || !SUPABASE_SERVICE_ROLE_KEY) {
-    throw new Error("Supabase environment variables are missing.");
-  }
-
-  if (!/^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(baseUrl)) {
-    throw new Error("SUPABASE_URL must look like https://xxxx.supabase.co");
-  }
-
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 12000);
-  let response;
-  try {
-    response = await fetch(`${baseUrl}/rest/v1/${path}`, {
-      ...options,
-      signal: controller.signal,
-      headers: {
-        apikey: SUPABASE_SERVICE_ROLE_KEY,
-        Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-        "Content-Type": "application/json",
-        Prefer: "return=representation",
-        ...(options.headers || {})
-      }
-    });
-  } catch (error) {
-    if (error.name === "AbortError") {
-      throw new Error("Supabase response timed out.");
-    }
-    throw error;
-  } finally {
-    clearTimeout(timer);
-  }
-
-  const text = await response.text();
-  const data = text ? JSON.parse(text) : null;
-  if (!response.ok) throw new Error(data?.message || text || "Supabase request failed.");
-  return data;
-}
-
-function toEventDb(item) {
-  const now = Date.now();
-  return {
-    id: item.id,
-    event_date: item.date,
-    title: item.title,
-    needed_count: Number(item.neededCount || 2),
-    memo: item.memo || "",
-    created_at: Number(item.createdAt || now),
-    updated_at: Number(item.updatedAt || now)
-  };
-}
-
-function toDayDb(day, eventId, now) {
-  return {
-    id: day.id || `${eventId}-${day.date.replace(/-/g, "")}`,
-    event_id: eventId,
-    event_date: day.date,
-    needed_count: Number(day.neededCount || 2),
-    created_at: Number(day.createdAt || now),
-    updated_at: Number(day.updatedAt || now)
-  };
-}
-
 function isMissingDayTableError(error) {
   const message = String(error?.message || error || "");
   return /exhibition_event_days|event_day_id|schema cache|relation|column/i.test(message)
     && /not exist|could not find|schema cache|does not exist/i.test(message);
 }
 
-function packMemo(memo, days) {
-  return `${String(memo || "").trim()}${PACK_PREFIX}${JSON.stringify({ days })}`;
-}
 
 function unpackMemo(rawMemo) {
   const raw = String(rawMemo || "");
@@ -142,23 +52,6 @@ function fromEventDb(row, days) {
   };
 }
 
-async function readBody(req) {
-  if (req.body && typeof req.body === "object") return req.body;
-  if (typeof req.body === "string") return JSON.parse(req.body || "{}");
-
-  return await new Promise((resolve, reject) => {
-    let raw = "";
-    req.on("data", chunk => { raw += chunk; });
-    req.on("end", () => {
-      try {
-        resolve(raw ? JSON.parse(raw) : {});
-      } catch (error) {
-        reject(error);
-      }
-    });
-    req.on("error", reject);
-  });
-}
 
 function cleanAttendees(value) {
   const allowed = new Set(["성진욱", "김무영", "이승엽", "김태홍", "제성규", "송진영", "이현욱"]);
@@ -192,14 +85,14 @@ function cleanDays(body) {
 }
 
 async function loadEvents() {
-  const events = await supabase("exhibition_events?select=*&order=event_date.desc,created_at.desc");
+  const events = await readAll("exhibition_events");
   let dayRows = [];
   try {
-    dayRows = await supabase("exhibition_event_days?select=*&order=event_date.asc");
+    dayRows = await readAll("exhibition_event_days");
   } catch (error) {
     if (!isMissingDayTableError(error)) throw error;
   }
-  const attendeeRows = await supabase("exhibition_attendees?select=*&order=created_at.asc");
+  const attendeeRows = await readAll("exhibition_attendees");
 
   const daysByEvent = {};
   dayRows.forEach(row => {
@@ -243,129 +136,28 @@ async function loadEvents() {
   });
 }
 
-async function savePackedEvent(event, days) {
-  const packedEvent = {
-    ...event,
-    memo: packMemo(event.memo, days)
-  };
-  const rows = await supabase("exhibition_events?on_conflict=id", {
-    method: "POST",
-    headers: { Prefer: "resolution=merge-duplicates,return=representation" },
-    body: JSON.stringify(toEventDb(packedEvent))
-  });
-  try {
-    await supabase(`exhibition_attendees?event_id=eq.${encodeURIComponent(event.id)}`, {
-      method: "DELETE"
-    });
-  } catch (error) {
-    if (!isMissingDayTableError(error)) throw error;
-  }
-  return fromEventDb(rows[0], days);
-}
 
 module.exports = async function handler(req, res) {
   try {
-    const requestUrl = new URL(req.url, "http://localhost");
-
-    if (req.method === "GET") {
-      if (requestUrl.searchParams.get("check") === "1") {
-        return json(res, 200, { ok: true });
-      }
-      return json(res, 200, await loadEvents());
+    const url = new URL(req.url, 'http://localhost');
+    if (req.method === 'GET') {
+      if (url.searchParams.get('check') === '1') return json(res,200,{ok:true});
+      return json(res,200,await loadEvents());
     }
-
-    if (req.method === "POST") {
-      const body = await readBody(req);
-      const now = Date.now();
-      const title = String(body.title || "").trim();
-      const days = cleanDays(body);
-      if (!days.length) return json(res, 400, { error: "days are required" });
-      if (!title) return json(res, 400, { error: "title is required" });
-      if (!days.some(day => day.attendees.length)) return json(res, 400, { error: "attendees are required" });
-
-      const event = {
-        id: body.id || `${now}-${Math.random().toString(16).slice(2)}`,
-        date: days[0].date,
-        title,
-        neededCount: Math.max(1, Math.min(7, Number(body.neededCount || days[0].neededCount || 2))),
-        memo: String(body.memo || "").trim(),
-        createdAt: Number(body.createdAt || now),
-        updatedAt: now
-      };
-
-      const rows = await supabase("exhibition_events?on_conflict=id", {
-        method: "POST",
-        headers: { Prefer: "resolution=merge-duplicates,return=representation" },
-        body: JSON.stringify(toEventDb(event))
-      });
-
-      try {
-        await supabase(`exhibition_attendees?event_id=eq.${encodeURIComponent(event.id)}`, {
-          method: "DELETE"
-        });
-        await supabase(`exhibition_event_days?event_id=eq.${encodeURIComponent(event.id)}`, {
-          method: "DELETE"
-        });
-
-        const dayPayload = days.map(day => toDayDb(day, event.id, now));
-        await supabase("exhibition_event_days", {
-          method: "POST",
-          body: JSON.stringify(dayPayload)
-        });
-
-        const attendeePayload = [];
-        dayPayload.forEach(day => {
-          const sourceDay = days.find(item => item.date === day.event_date) || { attendees: [] };
-          sourceDay.attendees.forEach(owner => {
-            attendeePayload.push({
-              id: `${day.id}-${owner}`,
-              event_id: event.id,
-              event_day_id: day.id,
-              owner,
-              created_at: now
-            });
-          });
-        });
-        if (attendeePayload.length) {
-          await supabase("exhibition_attendees", {
-            method: "POST",
-            body: JSON.stringify(attendeePayload)
-          });
-        }
-
-        return json(res, 200, fromEventDb(rows[0], dayPayload.map(day => ({
-          id: day.id,
-          date: day.event_date,
-          neededCount: day.needed_count,
-          attendees: (days.find(item => item.date === day.event_date) || { attendees: [] }).attendees
-        }))));
-      } catch (error) {
-        if (!isMissingDayTableError(error)) throw error;
-        return json(res, 200, await savePackedEvent(event, days));
-      }
-    }
-
-    if (req.method === "DELETE") {
-      const id = requestUrl.searchParams.get("id") || "";
-      if (!id) return json(res, 400, { error: "id is required" });
-      await supabase(`exhibition_attendees?event_id=eq.${encodeURIComponent(id)}`, {
-        method: "DELETE"
-      });
-      try {
-        await supabase(`exhibition_event_days?event_id=eq.${encodeURIComponent(id)}`, {
-          method: "DELETE"
-        });
-      } catch (error) {
-        if (!isMissingDayTableError(error)) throw error;
-      }
-      await supabase(`exhibition_events?id=eq.${encodeURIComponent(id)}`, {
-        method: "DELETE"
-      });
-      return json(res, 200, { ok: true });
-    }
-
-    return json(res, 405, { error: "Method not allowed" });
-  } catch (error) {
-    return json(res, 500, { error: error.message });
-  }
+    if (!['POST','DELETE'].includes(req.method)) return json(res,405,{error:'Method not allowed'});
+    const body = req.method === 'DELETE' ? Object.fromEntries(url.searchParams) : await readBody(req);
+    if (!body.operationId) throw new Error('client_update_required');
+    if (!body.id) throw new Error('invalid_request');
+    const deleting = req.method === 'DELETE';
+    const days = deleting ? [] : cleanDays(body);
+    if (!deleting && (!days.length || !String(body.title || '').trim() || !days.some(day => day.attendees.length))) throw new Error('invalid_request');
+    const result = await supabase('rpc/mutate_exhibition_safe',{
+      method:'POST',body:JSON.stringify({
+        p_event: deleting ? {id:body.id} : {id:body.id,title:String(body.title).trim(),days},
+        p_delete:deleting,p_expected_updated_at:body.expectedUpdatedAt == null ? null : Number(body.expectedUpdatedAt),
+        p_operation_id:body.operationId
+      })
+    });
+    return json(res,200,deleting ? result : fromEventDb(result.row,result.days));
+  } catch(error) { return errorResponse(res,error); }
 };
