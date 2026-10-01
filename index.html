@@ -2478,7 +2478,7 @@
     }
 
   </style>
-  <link rel="stylesheet" href="workspace.css?v=20260930-capture-design">
+  <link rel="stylesheet" href="workspace.css?v=20261002-analytics-compact">
 </head>
 <body class="view-form workspace">
   <header class="workspace-topbar">
@@ -2758,13 +2758,12 @@
         <span>담당자</span>
         <select id="analyticsOwner" aria-label="분석 담당자"><option value="">전체 담당자</option></select>
       </label>
-      <div class="analytics-table-wrap" tabindex="0" role="region" aria-label="월별 실적 집계표">
-        <table class="analytics-table">
-          <caption class="sr-only" id="analyticsCaption">월별 실적</caption>
-          <thead><tr><th scope="col" id="analyticsGroupTitle">담당자</th><th scope="col">신규 건수</th><th scope="col">신규 금액</th><th scope="col">매출증대 건수</th><th scope="col">매출증대 금액</th><th scope="col">전체 건수</th><th scope="col">전체 금액</th></tr></thead>
-          <tbody id="analyticsRows"></tbody>
-          <tfoot id="analyticsTotal"></tfoot>
-        </table>
+      <div class="analytics-summary" id="analyticsSummary" aria-label="월별 실적 합계"></div>
+      <div class="analytics-list-heading"><h3 id="analyticsGroupTitle">담당자별 실적</h3><span id="analyticsGroupCount"></span></div>
+      <p class="sr-only" id="analyticsCaption">월별 실적</p>
+      <div class="analytics-list-scroll" tabindex="0" aria-label="실적 목록">
+        <div class="analytics-column-head" aria-hidden="true"><span>담당자 / 지점</span><div class="analytics-metrics"><span>전체 금액 · 건수</span><span>신규 · 건수</span><span>매출증대 · 건수</span></div><span></span></div>
+        <div id="analyticsRows" aria-describedby="analyticsCaption"></div>
       </div>
       <p class="analytics-empty" id="analyticsEmpty" hidden>선택한 월의 보고가 없습니다.</p>
     </section>
@@ -3023,7 +3022,7 @@
   <script src="app.js?v=20260930-capture-design"></script>
   <script src="site-tools.js?v=20260918-notifications-2"></script>
   <script src="branch-headquarters.js?v=20260929-all-owner-branches"></script>
-  <script src="analytics.js?v=20260929-owner-total-order"></script>
+  <script src="analytics.js?v=20261002-analytics-compact"></script>
   <script src="workspace.js?v=20260928-analytics"></script>
 </body>
 </html>
