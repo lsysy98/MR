@@ -306,10 +306,7 @@ function weekNumberOfDateInMonth(value, info) {
   return Math.ceil((d.getDate() + firstOffset) / 7);
 }
 function weekMonthInfo(startText) {
-  if (!startText || startText === selectedWeekStart) {
-    return { year: selectedWeekYear, month: selectedWeekMonth };
-  }
-  var base = parseDateText(startText);
+  var base = parseDateText(weeklyReportingRange(startText || selectedWeekStart).start);
   return { year: base.getFullYear(), month: base.getMonth() + 1 };
 }
 function clampDateToMonth(value, info) {
@@ -1853,8 +1850,21 @@ function monthlyItems() {
   });
 }
 function weekRange() {
-  var start = parseDateText(selectedWeekStart);
+  return weeklyReportingRange(selectedWeekStart);
+}
+function weeklyReportingRange(startText) {
+  var start = startOfWeekDate(parseDateText(startText));
   var end = addDays(start, 4);
+  var monthEnd = new Date(start.getFullYear(), start.getMonth() + 1, 0);
+  if (end > monthEnd) {
+    end = monthEnd;
+  } else {
+    // Carry the new month's deferred days into its next full reporting week.
+    var previousStart = addDays(start, -7);
+    var previousEnd = addDays(previousStart, 4);
+    var previousMonthEnd = new Date(previousStart.getFullYear(), previousStart.getMonth() + 1, 0);
+    if (previousEnd > previousMonthEnd) start = addDays(previousMonthEnd, 1);
+  }
   return { start: dateText(start), end: dateText(end) };
 }
 function monthBoundedWeekRange() {
