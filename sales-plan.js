@@ -128,6 +128,7 @@
   }
   function rows() {
     var month = el('planMonth').value;
+    if (month<'2026-10') return [];
     var currentMonth = new Date().toLocaleDateString('sv-SE', {timeZone:'Asia/Seoul'}).slice(0,7);
     if (month > currentMonth) return [];
     if (!monthRows.has(month)) {
@@ -156,7 +157,11 @@
     var alive = new Set();
     var linked = [];
     reports.forEach(function (report) {
-      if (!report.id || String(report.date).slice(0,7) !== month || !names.includes(report.owner)) return;
+      var collectionYear=Number(report.collectionYear || String(report.date).slice(0,4));
+      var collectionMonth=Number(report.collectionMonth || String(report.date).slice(5,7));
+      var planDate=new Date(collectionYear,collectionMonth-2,1);
+      var reportPlanMonth=planDate.getFullYear()+'-'+String(planDate.getMonth()+1).padStart(2,'0');
+      if (!report.id || reportPlanMonth !== month || !names.includes(report.owner)) return;
       var id = String(report.id); if (alive.has(id)) return; alive.add(id);
       var source = { owner:report.owner, client:report.client, branch:report.branchName || '지점 미지정', code:String(report.clientCode || ''), type:report.type === '매출증대' || report.type === '증대' ? '증대' : '신규', product:productGroup(report.product), amount:Number(report.amount || 0), visit:report.date };
       if (source.type==='증대' && source.product==='3제+클로르') source.product='3제';
@@ -225,11 +230,11 @@
     updateSummary(); el('planCount').textContent = selected + ' · ' + visible.length + '곳'; el('planRows').replaceChildren();
     visible.forEach(function (r,index) { var tr = node('tr'); if (r.reportId) tr.dataset.reportId=r.reportId; tr.append(node('th',index+1,'plan-row-number')); columns.forEach(function (column,colIndex) { tr.append(cell(r,column,index,colIndex)); }); el('planRows').append(tr); });
     el('planEmpty').hidden = visible.length > 0;
-    el('planAddRow').disabled = el('planMonth').value > new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Seoul'}).slice(0,7);
+    el('planAddRow').disabled = el('planMonth').value<'2026-10' || el('planMonth').value > new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Seoul'}).slice(0,7);
   }
   el('planAddRow').onclick = function () {
     var month = el('planMonth').value;
-    if (month > new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Seoul'}).slice(0,7)) return;
+    if (month<'2026-10' || month > new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Seoul'}).slice(0,7)) return;
     rows(); el('planSearch').value = '';
     monthRows.get(month).push({owner:selected,client:'',branch:'',code:'',type:'신규',product:'3제',amount:0,day:null,visit:'',status:'방문 예정',followup:'미정',note:'',generated:false,userAdded:true});
     persist(); render();
