@@ -14,6 +14,12 @@
   var fixtureMonths = ['2026-10'];
   var reportPlans = new Map();
   var productGroups = ['3제', '3제+클로르', '클로르'];
+  function planVisit(value,month) {
+    if (!value) return '';
+    var last=new Date(Number(month.slice(0,4)),Number(month.slice(5)),0).getDate();
+    var day=Math.max(1,Math.min(last,Number(String(value).slice(8,10)) || 1));
+    return month+'-'+String(day).padStart(2,'0');
+  }
   function productGroup(product) {
     var text = String(product || '');
     var chlor = /클로르|CHX/i.test(text);
@@ -163,7 +169,7 @@
       var reportPlanMonth=planDate.getFullYear()+'-'+String(planDate.getMonth()+1).padStart(2,'0');
       if (!report.id || reportPlanMonth !== month || !names.includes(report.owner)) return;
       var id = String(report.id); if (alive.has(id)) return; alive.add(id);
-      var source = { owner:report.owner, client:report.client, branch:report.branchName || '지점 미지정', code:String(report.clientCode || ''), type:report.type === '매출증대' || report.type === '증대' ? '증대' : '신규', product:productGroup(report.product), amount:Number(report.amount || 0), visit:report.date };
+      var source = { owner:report.owner, client:report.client, branch:report.branchName || '지점 미지정', code:String(report.clientCode || ''), type:report.type === '매출증대' || report.type === '증대' ? '증대' : '신규', product:productGroup(report.product), amount:Number(report.amount || 0), visit:planVisit(report.date,month) };
       if (source.type==='증대' && source.product==='3제+클로르') source.product='3제';
       var signature = JSON.stringify(source);
       var cached = reportPlans.get(id);
@@ -174,6 +180,7 @@
       cached.row.status='성공';
       linked.push(cached.row);
     });
+    monthRows.get(month).forEach(function (row) { if (row.visit) row.visit=planVisit(row.visit,month); });
     return replaceGeneratedPlans(monthRows.get(month),linked);
   }
   function node(tag, text, cls) { var n = document.createElement(tag); if (text !== undefined) n.textContent = text; if (cls) n.className = cls; return n; }
@@ -199,6 +206,10 @@
     var choices = column.key==='product' && row.type==='증대' ? ['3제','클로르'] : column.choices;
     if (choices) choices.forEach(function (choice) { var option = node('option',choice); option.value = choice; input.append(option); }); else input.type = column.type || 'text';
     if (column.type === 'number') { input.min = '0'; input.step = '0.0001'; }
+    if (column.type === 'date') {
+      var month=el('planMonth').value;
+      input.min=month+'-01'; input.max=planVisit(month+'-31',month);
+    }
     function value() { return column.key === 'amount' ? row.amount / 10000 : column.key === 'visit' ? row.visit || (row.day ? el('planMonth').value + '-' + String(row.day).padStart(2,'0') : '') : row[column.key]; }
     input.value = value(); input.title = String(input.value); input.setAttribute('aria-label',(index+1) + '행 ' + column.label); input.dataset.key = column.key; input.dataset.column = colIndex;
     if (column.key === 'status') input.dataset.status = row.status;
