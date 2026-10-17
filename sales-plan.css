@@ -1,0 +1,58 @@
+#salesPlanPanel { display:none; min-width:0; grid-column:1 / -1; }
+.workspace.view-salesplan #salesPlanPanel { display:block; }
+.workspace.view-salesplan main > :not(#salesPlanPanel) { display:none !important; }
+.plan-toolbar,.plan-controls,.plan-list-heading { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:12px; }
+.plan-toolbar h2 { font-size:18px; margin:0; }
+.plan-toolbar input { width:150px; }
+.plan-controls select { width:140px; }
+.plan-controls input { width:220px; }
+.plan-controls :is(input,select),.plan-toolbar input { margin:0; min-height:34px; background:white; }
+.plan-summary { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); padding:12px 0; border-block:1px solid #dce3e7; background:#fff; margin-bottom:16px; }
+.plan-summary > div { padding:0 16px; border-right:1px solid #dce3e7; }
+.plan-summary > div:last-child { border:0; }
+.plan-summary span { color:#65727b; font-size:12px; margin-right:10px; }
+.plan-summary strong { font-size:19px; color:#172126; white-space:nowrap; }
+.plan-summary .plan-confirmed strong { color:#ce4b0a; }
+.plan-list-heading h3 { margin:0; font-size:14px; }
+.plan-list-heading span { font-size:12px; color:#65727b; }
+.plan-table-scroll { overflow:auto; max-height:72vh; border:1px solid #dce3e7; border-radius:4px; }
+.plan-table { border-collapse:separate; border-spacing:0; width:100%; min-width:1330px; table-layout:fixed; background:white; font-size:13px; }
+.plan-table th { background:#f4f6f7; color:#647078; text-align:left; font-size:12px; padding:0 8px; white-space:nowrap; font-weight:500; }
+.plan-table thead th { height:32px; position:sticky; top:0; z-index:2; border-bottom:1px solid #dce3e7; }
+.plan-table :is(td,th) { border-right:1px solid #e5eaed; }
+.plan-table thead th:nth-child(1) { width:34px; }
+.plan-table thead th:nth-child(2) { width:94px; }
+.plan-table thead th:nth-child(3) { width:178px; }
+.plan-table thead th:nth-child(4) { width:100px; }
+.plan-table thead th:nth-child(5) { width:82px; }
+.plan-table thead th:nth-child(6) { width:172px; }
+.plan-table thead th:nth-child(7) { width:114px; }
+.plan-table thead th:nth-child(8) { width:130px; }
+.plan-table thead th:nth-child(9) { width:104px; }
+.plan-table thead th:nth-child(10) { width:140px; }
+.plan-table thead th:nth-child(11) { width:180px; }
+.plan-table tbody :is(td,th) { height:32px; padding:0; border-bottom:1px solid #e5eaed; }
+.plan-table .plan-row-number { text-align:center; font-size:11px; color:#7b878e; }
+.workspace .plan-table .plan-cell :is(input,select) { display:block; width:100%; max-width:100%; height:31px; min-height:0; margin:0; padding:0 8px; border:0; border-radius:0; box-shadow:none; outline:none; background:transparent; color:#34434c; font-family:inherit; font-size:13px; line-height:normal; }
+.workspace .plan-table .plan-cell :is(input,select):hover { background-color:#f6f8fa; }
+.workspace #salesPlanPanel .plan-cell input { height:31px !important; min-height:0 !important; padding:0 8px !important; font-size:13px !important; border:0 !important; border-radius:0 !important; box-shadow:none !important; background:transparent; }
+.workspace .plan-table .plan-cell :is(input,select):focus { background-color:#fff; outline:2px solid #db620e; outline-offset:-2px; }
+.workspace .plan-table .plan-cell-client input { color:#172126; font-weight:650; }
+.workspace .plan-table .plan-cell-code input { color:#567080; font-size:12px; }
+.workspace .plan-table .plan-cell-amount input { text-align:right; font-variant-numeric:tabular-nums; font-weight:650; }
+.workspace .plan-table [data-status="성공"] { color:#24785d !important; }
+.workspace .plan-table [data-status="재방문"] { color:#a96829 !important; }
+.plan-add-row { display:flex; align-items:center; gap:8px; width:100%; min-height:36px; margin-top:8px; padding:0 12px; border:1px dashed #cfd8de; border-radius:4px; background:transparent; color:#52616b; font:inherit; font-size:13px; cursor:pointer; }
+.plan-add-row:hover { background:#fff3e9; color:#bd4b0a; border-color:#df9a6b; }
+.plan-add-row:disabled { opacity:.45; cursor:default; }
+@media(max-width:900px) {
+ .plan-toolbar,.plan-controls { gap:8px; }
+ .plan-controls input { width:54%; }
+ .plan-controls select { width:42%; }
+ .plan-summary { grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px 0; }
+ .plan-summary > div { padding:0 10px; }
+ .plan-summary > div:nth-child(2) { border:0; }
+ .plan-summary span { display:block; margin:0 0 4px; }
+ .plan-summary strong { font-size:18px; }
+ .plan-table-scroll { max-height:65vh; }
+}
