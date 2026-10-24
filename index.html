@@ -2769,7 +2769,7 @@
       <p class="analytics-empty" id="analyticsEmpty" hidden>선택한 월의 보고가 없습니다.</p>
     </section>
     <section id="salesPlanPanel" aria-labelledby="salesPlanTitle">
-      <div class="plan-toolbar"><h2 id="salesPlanTitle">영업계획서</h2><input id="planMonth" type="month" value="2026-10" aria-label="계획 월"></div>
+      <div class="plan-toolbar"><h2 id="salesPlanTitle">영업계획서</h2><div class="plan-month-nav"><button id="planPrevMonth" class="btn icon-only" type="button" aria-label="이전 달" title="이전 달"><svg width="16" height="16" aria-hidden="true"><use href="assets/workspace-icons.svg#chevron-left"></use></svg></button><input id="planMonth" type="month" value="2026-10" min="2026-10" aria-label="계획 월"><button id="planNextMonth" class="btn icon-only" type="button" aria-label="다음 달" title="다음 달"><svg width="16" height="16" aria-hidden="true"><use href="assets/workspace-icons.svg#chevron-right"></use></svg></button></div></div>
       <div class="plan-controls"><select id="planOwner" aria-label="담당자"></select><input id="planSearch" type="search" placeholder="거래처 · 지점 검색" aria-label="계획 거래처 검색"></div>
       <div id="planSummary" class="plan-summary"></div>
       <div class="plan-list-heading"><h3>거래처별 계획</h3><span id="planCount"></span></div>
@@ -3036,7 +3036,7 @@
   <script src="workspace.js?v=20261018-sales-plan"></script>
   <link rel="stylesheet" href="sales-plan.css?v=20261018">
   <script src="sales-plan-clients.js?v=20261018"></script>
-  <script src="sales-plan.js?v=20261018-plan-visit-month"></script>
+  <script src="sales-plan.js?v=20261024-report-date"></script>
 </body>
 </html>
 

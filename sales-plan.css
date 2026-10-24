@@ -4,6 +4,9 @@
 .plan-toolbar,.plan-controls,.plan-list-heading { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:12px; }
 .plan-toolbar h2 { font-size:18px; margin:0; }
 .plan-toolbar input { width:150px; }
+.plan-month-nav { display:flex; align-items:center; gap:4px; min-width:0; }
+.workspace .plan-month-nav .btn { width:30px; min-width:30px; min-height:34px; padding:0; }
+@media(max-width:400px) { .plan-toolbar h2 { font-size:16px; } .plan-toolbar input { width:126px; padding-inline:6px; } .plan-month-nav { gap:1px; } .workspace .plan-month-nav .btn { width:26px; min-width:26px; } }
 .plan-controls select { width:140px; }
 .plan-controls input { width:220px; }
 .plan-controls :is(input,select),.plan-toolbar input { margin:0; min-height:34px; background:white; }
