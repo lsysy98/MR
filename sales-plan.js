@@ -13,6 +13,21 @@
   function persist() { try { localStorage.setItem(storageKey,JSON.stringify(Object.fromEntries(monthRows))); } catch (_) {} }
   var fixtureMonths = ['2026-10'];
   var reportPlans = new Map();
+  var reportVisits={};
+  var reportVisitsKey='test-sales-plan-report-visits-v1';
+  try { var visits=JSON.parse(localStorage.getItem(reportVisitsKey)||'{}'); if (visits && typeof visits==='object' && !Array.isArray(visits)) reportVisits=visits; } catch (_) {}
+  function randomReportVisit(report,month,today) {
+    var last=new Date(Number(month.slice(0,4)),Number(month.slice(5)),0).getDate();
+    var limit=month===today.slice(0,7) ? Number(today.slice(8))-1 : month<today.slice(0,7) ? last : 0;
+    if (limit<1) return '';
+    var key=JSON.stringify([month,report.owner,String(report.id)]);
+    var saved=reportVisits[key];
+    if (typeof saved==='string' && saved.slice(0,7)===month && saved<today && Number(saved.slice(8))>=1 && Number(saved.slice(8))<=limit) return saved;
+    var day=1+Math.floor(monthRandom(report.owner,month+'|visit|'+report.id)()*limit);
+    var value=month+'-'+String(day).padStart(2,'0'); reportVisits[key]=value;
+    try { localStorage.setItem(reportVisitsKey,JSON.stringify(reportVisits)); } catch (_) {}
+    return value;
+  }
   var productGroups = ['3제', '3제+클로르', '클로르'];
   function planVisit(value,month) {
     if (!value) return '';
@@ -169,7 +184,7 @@
       var reportPlanMonth=planDate.getFullYear()+'-'+String(planDate.getMonth()+1).padStart(2,'0');
       if (!report.id || reportPlanMonth !== month || !names.includes(report.owner)) return;
       var id = String(report.id); if (alive.has(id)) return; alive.add(id);
-      var source = { owner:report.owner, client:report.client, branch:report.branchName || '지점 미지정', code:String(report.clientCode || ''), type:report.type === '매출증대' || report.type === '증대' ? '증대' : '신규', product:productGroup(report.product), amount:Number(report.amount || 0), visit:String(report.date || '') };
+      var source = { owner:report.owner, client:report.client, branch:report.branchName || '지점 미지정', code:String(report.clientCode || ''), type:report.type === '매출증대' || report.type === '증대' ? '증대' : '신규', product:productGroup(report.product), amount:Number(report.amount || 0), visit:randomReportVisit(report,month,today) };
       if (source.type==='증대' && source.product==='3제+클로르') source.product='3제';
       var signature = JSON.stringify(source);
       var cached = reportPlans.get(id);
@@ -178,7 +193,7 @@
       cached.row.reportAmount=Number(report.amount || 0);
       cached.row.reportId=id;
       cached.row.visit=source.visit;
-      cached.row.status=source.visit && source.visit<=today ? '성공' : '방문 예정';
+      cached.row.status=report.date && report.date<=today ? '성공' : '방문 예정';
       linked.push(cached.row);
     });
     monthRows.get(month).forEach(function (row) { if (row.visit) row.visit=planVisit(row.visit,month); });
