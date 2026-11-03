@@ -65,7 +65,7 @@
   function refreshNotifications() {
     var changed = connected && ($('notificationOwner').value !== saved.owner || $('notificationTime').value !== saved.reminderTime);
     $('notificationEnable').disabled = !supported || needsHome || !settings || !settings.ready || !registration || !$('notificationOwner').value || !$('notificationTime').validity.valid;
-    $('notificationEnable').textContent = changed ? '알림 설정 저장' : (connected ? '알림 연결 확인' : '알림 받기');
+    $('notificationEnable').textContent = changed ? '알림 설정 저장' : (connected ? '알림 연결됨' : '알림 받기');
     $('notificationTest').disabled = !connected || changed || !settings || !settings.ready;
     $('notificationDisable').disabled = !registration || (!saved.id && !connected);
   }
