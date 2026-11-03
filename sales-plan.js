@@ -11,11 +11,12 @@
   var previousVersion = 1;
   try { var stored = localStorage.getItem(storageKey); var v2 = localStorage.getItem('test-sales-plan-drafts-v2'); previousVersion = v2 ? 2 : 1; migrateDrafts = !stored; var saved = JSON.parse(stored || v2 || localStorage.getItem('test-sales-plan-drafts-v1') || '{}'); Object.keys(saved).forEach(function (month) { if (Array.isArray(saved[month])) monthRows.set(month,saved[month]); }); } catch (_) {}
   function persist() { try { localStorage.setItem(storageKey,JSON.stringify(Object.fromEntries(monthRows))); } catch (_) {} }
-  var fixtureMonths = ['2026-10'];
+  var fixtureMonths = ['2026-10','2026-11'];
   var reportPlans = new Map();
   var reportVisits={};
   var reportVisitsKey='test-sales-plan-report-visits-v1';
   try { var visits=JSON.parse(localStorage.getItem(reportVisitsKey)||'{}'); if (visits && typeof visits==='object' && !Array.isArray(visits)) reportVisits=visits; } catch (_) {}
+  function visitOverrideKey(reportId,month) { return JSON.stringify(['manual',month,String(reportId)]); }
   function randomReportVisit(report,month,today) {
     var last=new Date(Number(month.slice(0,4)),Number(month.slice(5)),0).getDate();
     if (month >= '2026-11') {
@@ -33,12 +34,6 @@
     return value;
   }
   var productGroups = ['3제', '3제+클로르', '클로르'];
-  function planVisit(value,month) {
-    if (!value) return '';
-    var last=new Date(Number(month.slice(0,4)),Number(month.slice(5)),0).getDate();
-    var day=Math.max(1,Math.min(last,Number(String(value).slice(8,10)) || 1));
-    return month+'-'+String(day).padStart(2,'0');
-  }
   function productGroup(product) {
     var text = String(product || '');
     var chlor = /클로르|CHX/i.test(text);
@@ -126,7 +121,7 @@
       var own=plans.filter(function (r) { return r.owner===owner; });
       var actual=linked.filter(function (r) { return r.owner===owner; }).reduce(function (sum,r) { return sum+Math.max(0,r.reportAmount); },0);
       var matched=own.filter(function (r) { return r.generated && keys.has(owner+'|'+r.code); }).reduce(function (sum,r) { return sum+r.amount; },0);
-      var remaining=own.filter(function (r) { return !keys.has(owner+'|'+r.code); });
+      var remaining=own.filter(function (r) { return r.generated!==true || !keys.has(owner+'|'+r.code); });
       var candidates=remaining.filter(function (r) { return r.generated===true && !r.carriedFrom && r.amount>0; });
       var maxRemove=Math.max(0,remaining.length+linked.filter(function (r) { return r.owner===owner; }).length-20);
       var target=Math.max(0,actual-matched);
@@ -162,7 +157,7 @@
       var carried = (monthRows.get(previousMonth) || []).filter(function (r) { return r.followup === '다음 달 이월' && r.status !== '성공' && r.status !== '제외'; }).map(function (r) {
         return Object.assign({},r,{status:'방문 예정',followup:'미정',visit:'',day:1,carriedFrom:previousMonth,generated:false});
       });
-      var generated = fixtureMonths.includes(month) ? createRows(month) : [];
+      var generated = fixtureMonths.includes(month) && month!=='2026-11' ? createRows(month) : [];
       var plans = names.flatMap(function (owner) {
         var carry = carried.filter(function (r) { return r.owner === owner; });
         var used = new Set(carry.map(function (r) { return r.code; }));
@@ -188,7 +183,8 @@
       var reportPlanMonth=planDate.getFullYear()+'-'+String(planDate.getMonth()+1).padStart(2,'0');
       if (!report.id || reportPlanMonth !== month || !names.includes(report.owner)) return;
       var id = String(report.id); if (alive.has(id)) return; alive.add(id);
-      var source = { owner:report.owner, client:report.client, branch:report.branchName || '지점 미지정', code:String(report.clientCode || ''), type:report.type === '매출증대' || report.type === '증대' ? '증대' : '신규', product:productGroup(report.product), amount:Number(report.amount || 0), visit:randomReportVisit(report,month,today) };
+      var override = reportVisits[visitOverrideKey(id,month)];
+      var source = { owner:report.owner, client:report.client, branch:report.branchName || '지점 미지정', code:String(report.clientCode || ''), type:report.type === '매출증대' || report.type === '증대' ? '증대' : '신규', product:productGroup(report.product), amount:Number(report.amount || 0), visit:typeof override === 'string' ? override : randomReportVisit(report,month,today) };
       if (source.type==='증대' && source.product==='3제+클로르') source.product='3제';
       var signature = JSON.stringify(source);
       var cached = reportPlans.get(id);
@@ -197,11 +193,31 @@
       cached.row.reportAmount=Number(report.amount || 0);
       cached.row.reportId=id;
       cached.row.visit=source.visit;
-      var visitPassed = month < '2026-11' || (source.visit && source.visit < today);
+      var visitPassed = (month < '2026-11' && typeof override !== 'string') || (source.visit && source.visit < today);
       cached.row.status=visitPassed && report.date && report.date<=today ? '성공' : '방문 예정';
       linked.push(cached.row);
     });
-    monthRows.get(month).forEach(function (row) { if (row.visit) row.visit=planVisit(row.visit,month); });
+    if (month==='2026-11') {
+      var plans=monthRows.get(month);
+      var missing=names.filter(function (owner) {
+        var actual=linked.filter(function (r) { return r.owner===owner; });
+        var codes=new Set(actual.map(function (r) { return r.code; }));
+        return actual.length+plans.filter(function (r) { return r.owner===owner && (r.generated!==true || !codes.has(r.code)); }).length<20;
+      });
+      if (missing.length) {
+        var fresh=createRows(month);
+        missing.forEach(function (owner) {
+          var actual=linked.filter(function (r) { return r.owner===owner; });
+          var own=plans.filter(function (r) { return r.owner===owner; });
+          var linkedCodes=new Set(actual.map(function (r) { return r.code; }));
+          var used=new Set(own.concat(actual).map(function (r) { return r.code; }));
+          var count=actual.length+own.filter(function (r) { return r.generated!==true || !linkedCodes.has(r.code); }).length;
+          fresh.filter(function (r) { return r.owner===owner && !used.has(r.code) && !/^D\d+$/.test(r.code); })
+            .slice(0,20-count).forEach(function (r) { r.day=12+(r.day%16); r.status='방문 예정'; plans.push(r); });
+        });
+        persist();
+      }
+    }
     return replaceGeneratedPlans(monthRows.get(month),linked);
   }
   function node(tag, text, cls) { var n = document.createElement(tag); if (text !== undefined) n.textContent = text; if (cls) n.className = cls; return n; }
@@ -227,11 +243,6 @@
     var choices = column.key==='product' && row.type==='증대' ? ['3제','클로르'] : column.choices;
     if (choices) choices.forEach(function (choice) { var option = node('option',choice); option.value = choice; input.append(option); }); else input.type = column.type || 'text';
     if (column.type === 'number') { input.min = '0'; input.step = '0.0001'; }
-    if (column.type === 'date' && row.reportId) input.readOnly=true;
-    if (column.type === 'date' && !row.reportId) {
-      var month=el('planMonth').value;
-      input.min=month+'-01'; input.max=planVisit(month+'-31',month);
-    }
     function value() { return column.key === 'amount' ? row.amount / 10000 : column.key === 'visit' ? row.visit || (row.day ? el('planMonth').value + '-' + String(row.day).padStart(2,'0') : '') : row[column.key]; }
     input.value = value(); input.title = String(input.value); input.setAttribute('aria-label',(index+1) + '행 ' + column.label); input.dataset.key = column.key; input.dataset.column = colIndex;
     if (column.key === 'status') input.dataset.status = row.status;
@@ -239,6 +250,14 @@
     function commit() {
       if (!input.checkValidity() || column.type === 'number' && input.value.trim() === '') { input.value = value(); return; }
       row[column.key] = column.key === 'amount' ? Math.round(Number(input.value)*10000) : input.value.trim(); input.title = String(input.value);
+      if (column.key==='visit' && row.reportId) {
+        reportVisits[visitOverrideKey(row.reportId,el('planMonth').value)]=row.visit;
+        try { localStorage.setItem(reportVisitsKey,JSON.stringify(reportVisits)); } catch (_) {}
+        updateSummary();
+        var statusInput=td.parentElement.querySelector('[data-key="status"]');
+        statusInput.value=row.status; statusInput.dataset.status=row.status;
+        return;
+      }
       row.userEdited=true;
       if (row.generated) row.generated=false;
       if (column.key==='type') {
@@ -336,7 +355,7 @@
     }
   } catch (_) {}
   monthRows.forEach(function (plans,month) {
-    if (!fixtureMonths.includes(month)) return;
+    if (!fixtureMonths.includes(month) || month==='2026-11') return;
     var fresh=createRows(month);
     names.forEach(function (owner) {
       var own=plans.filter(function (r) { return r.owner===owner; });
