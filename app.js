@@ -1983,7 +1983,7 @@ function weeklyReportText() {
   var weekSummary = summarize(weekItems);
   var monthItems = reportDateMonthItems(range.year, range.month, range.end);
   var monthSummary = summarize(monthItems);
-  var targetAmount = ownerCount() * 2000000;
+  var targetAmount = teamMonthlyTarget();
   var startDate = parseDateText(range.start);
   var endDate = parseDateText(range.end);
   var endIncludesMonth = startDate.getFullYear() !== endDate.getFullYear() || startDate.getMonth() !== endDate.getMonth();
@@ -2005,7 +2005,7 @@ function weeklyReportText() {
         monthGroup.owner,
         "주간 " + reportWonMan(weekGroup.summary.total.amount),
         "(신규 " + weekGroup.summary.new.count + " / 증대 " + weekGroup.summary.growth.count + ")",
-        "누적 " + reportWonMan(monthGroup.summary.total.amount) + " / " + percentText(monthGroup.summary.total.amount, 2000000),
+        "누적 " + reportWonMan(monthGroup.summary.total.amount) + " / " + percentText(monthGroup.summary.total.amount, ownerMonthlyTarget(monthGroup.owner)),
         "(신규 " + monthGroup.summary.new.count + " / 증대 " + monthGroup.summary.growth.count + ")"
       ].join("\n");
     });
@@ -3384,8 +3384,14 @@ function groupByOwner(items) {
 function ownerCount() {
   return ownerNames.length;
 }
-function ownerAchievementRate(amount) {
-  return Math.round((Number(amount) || 0) / 2000000 * 100);
+function ownerMonthlyTarget(owner) {
+  return owner === "성진욱" ? 1000000 : 2000000;
+}
+function teamMonthlyTarget() {
+  return ownerNames.reduce(function(total, owner) { return total + ownerMonthlyTarget(owner); }, 0);
+}
+function ownerAchievementRate(amount, owner) {
+  return Math.round((Number(amount) || 0) / ownerMonthlyTarget(owner) * 100);
 }
 
 function prescriptionButton(item) {
@@ -3639,14 +3645,14 @@ function renderOwnerCards(items) {
   renderOwnerSearchResults();
 
   groupByOwner(items).sort(function(a, b) {
-    var rateDiff = ownerAchievementRate(b.summary.total.amount) - ownerAchievementRate(a.summary.total.amount);
+    var rateDiff = ownerAchievementRate(b.summary.total.amount, b.owner) - ownerAchievementRate(a.summary.total.amount, a.owner);
     if (rateDiff !== 0) return rateDiff;
     var amountDiff = b.summary.total.amount - a.summary.total.amount;
     if (amountDiff !== 0) return amountDiff;
     return ownerNames.indexOf(a.owner) - ownerNames.indexOf(b.owner);
   }).forEach(function(group) {
     var summary = group.summary;
-    var achievementRate = ownerAchievementRate(summary.total.amount);
+    var achievementRate = ownerAchievementRate(summary.total.amount, group.owner);
     var card = document.createElement("div");
     card.className = "owner-card" + (openedOwner === group.owner ? " open" : "");
     card.dataset.owner = group.owner;
@@ -4040,7 +4046,7 @@ function renderMeetingCards(items) {
       name.textContent = group.owner;
       var rate = document.createElement("span");
       rate.className = "meeting-rate";
-      rate.textContent = ownerAchievementRate(group.summary.total.amount) + "%";
+      rate.textContent = ownerAchievementRate(group.summary.total.amount, group.owner) + "%";
       head.appendChild(name);
       head.appendChild(rate);
 
@@ -4100,7 +4106,7 @@ function renderMeetingCards(items) {
   var kpis = document.createElement("div");
   kpis.className = "meeting-slide-kpis";
   [
-    { label: "월 누적", value: won(group.summary.total.amount), note: ownerAchievementRate(group.summary.total.amount) + "%" },
+    { label: "월 누적", value: won(group.summary.total.amount), note: ownerAchievementRate(group.summary.total.amount, group.owner) + "%" },
     { label: "신규", value: won(group.summary.new.amount), note: group.summary.new.count + "건" },
     { label: "매출증대", value: won(group.summary.growth.amount), note: group.summary.growth.count + "건" }
   ].forEach(function(row) {
@@ -4263,7 +4269,7 @@ function openMeetingPresentation(group) {
   name.textContent = group.owner;
   title.appendChild(eyebrow);
   title.appendChild(name);
-  var rateValue = ownerAchievementRate(group.summary.total.amount);
+  var rateValue = ownerAchievementRate(group.summary.total.amount, group.owner);
   var totalCard = document.createElement("div");
   totalCard.className = "presentation-total-card";
   var totalLabel = document.createElement("span");
@@ -4271,7 +4277,7 @@ function openMeetingPresentation(group) {
   var totalValue = document.createElement("strong");
   totalValue.textContent = wonMan(group.summary.total.amount);
   var goalLine = document.createElement("small");
-  goalLine.textContent = "목표 200만원 · 목표대비 " + rateValue + "%";
+  goalLine.textContent = "목표 " + wonMan(ownerMonthlyTarget(group.owner)) + " · 목표대비 " + rateValue + "%";
   var progress = document.createElement("div");
   progress.className = "presentation-progress";
   var progressBar = document.createElement("i");
@@ -4649,7 +4655,7 @@ function render() {
   var teamItems = teamPeriodItems();
   var summary = summarize(items);
   var teamSummary = summarize(teamItems);
-  var targetAmount = ownerCount() * 2000000;
+  var targetAmount = teamMonthlyTarget();
   var achievementRate = targetAmount ? Math.round(summary.total.amount / targetAmount * 100) : 0;
 
   syncMonthPicker();

@@ -229,7 +229,7 @@
     var total = all.reduce(function (sum,r) { return sum + (r.status === '제외' ? 0 : r.amount); }, 0);
     var success = all.filter(function (r) { return r.status === '성공'; });
     el('planSummary').replaceChildren();
-    [['목표매출', money(2000000)], ['예상매출', money(total)], ['확정매출', money(success.reduce(function (sum,r) { return sum + r.amount; },0))], ['성공률', (all.length ? Math.round(success.length / all.length * 100) : 0) + '%']].forEach(function (metric,i) { var box = node('div',undefined,i === 2 ? 'plan-confirmed' : ''); box.append(node('span',metric[0]),node('strong',metric[1])); el('planSummary').append(box); });
+    [['목표매출', money(ownerMonthlyTarget(selected))], ['예상매출', money(total)], ['확정매출', money(success.reduce(function (sum,r) { return sum + r.amount; },0))], ['성공률', (all.length ? Math.round(success.length / all.length * 100) : 0) + '%']].forEach(function (metric,i) { var box = node('div',undefined,i === 2 ? 'plan-confirmed' : ''); box.append(node('span',metric[0]),node('strong',metric[1])); el('planSummary').append(box); });
   }
   var columns = [
     {key:'branch',label:'지점'}, {key:'client',label:'거래처명'}, {key:'code',label:'거래처코드'},
