@@ -18,6 +18,10 @@
   try { var visits=JSON.parse(localStorage.getItem(reportVisitsKey)||'{}'); if (visits && typeof visits==='object' && !Array.isArray(visits)) reportVisits=visits; } catch (_) {}
   function randomReportVisit(report,month,today) {
     var last=new Date(Number(month.slice(0,4)),Number(month.slice(5)),0).getDate();
+    if (month >= '2026-11') {
+      var scheduledDay = 12 + Math.floor(monthRandom(report.owner, month+'|scheduled-visit|'+report.id)()*16);
+      return month+'-'+String(Math.min(last, scheduledDay)).padStart(2,'0');
+    }
     var limit=month===today.slice(0,7) ? Number(today.slice(8))-1 : month<today.slice(0,7) ? last : 0;
     if (limit<1) return '';
     var key=JSON.stringify([month,report.owner,String(report.id)]);
@@ -193,7 +197,8 @@
       cached.row.reportAmount=Number(report.amount || 0);
       cached.row.reportId=id;
       cached.row.visit=source.visit;
-      cached.row.status=report.date && report.date<=today ? '성공' : '방문 예정';
+      var visitPassed = month < '2026-11' || (source.visit && source.visit < today);
+      cached.row.status=visitPassed && report.date && report.date<=today ? '성공' : '방문 예정';
       linked.push(cached.row);
     });
     monthRows.get(month).forEach(function (row) { if (row.visit) row.visit=planVisit(row.visit,month); });
