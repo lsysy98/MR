@@ -2479,6 +2479,7 @@
 
   </style>
   <link rel="stylesheet" href="workspace.css?v=20261002-analytics-compact">
+  <link rel="stylesheet" href="guide.css?v=2">
 </head>
 <body class="view-form workspace">
   <header class="workspace-topbar">
@@ -2489,6 +2490,7 @@
       </div>
       <div class="workspace-team"><span>수도권팀</span></div>
       <div class="admin-menu-wrap">
+        <button class="guide-trigger" type="button" id="openUsageGuide" aria-haspopup="dialog">사용 가이드</button>
         <button class="header-settings header-menu-toggle" type="button" id="adminMenuBtn" aria-label="메뉴" aria-expanded="false" title="메뉴">
           <i data-icon="menu" aria-hidden="true"></i>
         </button>
@@ -3017,6 +3019,25 @@
       </div>
     </div>
   </div>
+  <dialog class="usage-guide" id="usageGuide" aria-labelledby="usageGuideTitle">
+    <header class="guide-header">
+      <h2 id="usageGuideTitle">사용 가이드</h2>
+      <form method="dialog"><button class="btn" autofocus>닫기</button></form>
+    </header>
+    <nav class="guide-topics" aria-label="가이드 항목">
+      <button type="button" data-guide="0" aria-pressed="true">보고 공유</button>
+      <button type="button" data-guide="1" aria-pressed="false">주간 보고</button>
+      <button type="button" data-guide="2" aria-pressed="false">연차</button>
+      <button type="button" data-guide="3" aria-pressed="false">알림</button>
+    </nav>
+    <figure class="guide-figure">
+      <figcaption id="usageGuideCaption">연차자 빼고 모두 ‘내 보고 완료’ 누르기 → 캡처 안내 → 공유</figcaption>
+      <div class="guide-picture" id="usageGuidePicture">
+        <img id="usageGuideImage" width="390" height="600" alt="">
+      </div>
+    </figure>
+  </dialog>
+  <script src="guide.js?v=5" defer></script>
   <div class="test-tools-overlay" id="notificationsOverlay" hidden>
     <section class="test-tools-dialog" role="dialog" aria-modal="true" aria-labelledby="notificationsTitle">
       <header><h2 id="notificationsTitle">일일보고 알림</h2><button class="btn" type="button" data-tools-close>닫기</button></header>
