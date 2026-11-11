@@ -1037,12 +1037,13 @@ function ownerSearchScopeOwner() {
   return ownerNames.indexOf(owner) >= 0 ? owner : "";
 }
 function findDuplicateReport(item) {
+  var clientCode = itemClientCode(item);
   var clientName = normalizeClientName(item.client);
   return reports.find(function(report) {
-    return report.id !== item.id &&
-      report.owner === item.owner &&
-      report.type === item.type &&
-      normalizeClientName(report.client) === clientName;
+    if (report.id === item.id || report.owner !== item.owner || report.type !== item.type) return false;
+    var reportCode = itemClientCode(report);
+    if (clientCode && reportCode) return clientCode === reportCode;
+    return Boolean(clientName) && normalizeClientName(report.client) === clientName;
   });
 }
 function typeClass(type) {
